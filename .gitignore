@@ -6,4 +6,6 @@ _*
 *.vstf
 *.hex
 *.gz
+library/
+mnist_dataset/
 PE/aaa.py
