@@ -1,0 +1,18 @@
+read_verilog -rtl {adder_2.v adder_tree_8.v computer_unit.v PE.v PE_array.v MLB.v acc_out.v sort_relu.v top.v}
+current_design top
+link
+set_app_var search_path ./library
+set_app_var target_library smic18_ff.db
+set_app_var link_library smic18_ff.db
+
+check_design
+compile
+
+#1
+uplevel #0 { report_area }
+#2
+uplevel #0 { report_constraint -all_violators -significant_digits 2 -nosplit }
+#3
+uplevel #0 { report_timing -path full -delay max -nworst 1 -max_paths 1 -significant_digits 2 -sort_by group }
+#4
+uplevel #0 { report_power -analysis_effort low }

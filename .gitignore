@@ -1,0 +1,9 @@
+*.qdb
+*.qtl
+_*
+*.wlf
+*.bak
+*.vstf
+*.hex
+*.gz
+PE/aaa.py
