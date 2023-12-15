@@ -17,7 +17,8 @@ module PE_array(
     input [7:0]         Sel_cu,                                                     
     input [7:0]         Sel_cu_go_back,   //each signal for one column  
     input [7:0]         Sel_adder,           
-    input [3:0]         Is_save_cu_out,          
+    input [3:0]         Is_save_cu_out,
+    input               Clear_reg,     //clear all reg value          
     
                         //control output model(one row PE or one column PE or one PE or all PE)
     input [1:0]         Sum_row_pe,               
@@ -68,6 +69,8 @@ integer   cur_row_num;
 integer   cur_col_num; 
 reg[4:0]  k;
 
+reg[2:0]  pre_col_index;  //save last col_index value
+
 // reg variable initialization
 initial begin:initial_var
     integer i, j;
@@ -79,7 +82,7 @@ initial begin:initial_var
     end
     for (i = 0; i < 4; i = i + 1) begin
         row_pe_scalar[i] = 32'h0;
-        reg_scalar_output[i] = 32'h0;
+        // reg_scalar_output[i] = 32'h0;
     end
 
     for (i = 0; i < 16; i = i + 1) begin
@@ -99,6 +102,41 @@ initial begin:initial_var
     end
 end
 
+always @ (posedge clk or negedge rst)begin:clear_reg
+    integer i, j;
+    if(!rst)begin
+
+    end else begin
+        if(Clear_reg)begin
+            for (j = 0; j < 16; j = j + 1) begin
+                    row_pe_array0[j] = 32'h0;
+                    row_pe_array1[j] = 32'h0;
+                    row_pe_array2[j] = 32'h0;
+                    row_pe_array3[j] = 32'h0;
+            end
+            for (i = 0; i < 4; i = i + 1) begin
+                row_pe_scalar[i] = 32'h0;
+                // reg_scalar_output[i] = 32'h0;
+            end
+
+            for (i = 0; i < 16; i = i + 1) begin
+                reg_array_output0[i] = 32'h0;
+                reg_array_output1[i] = 32'h0;
+                reg_array_output2[i] = 32'h0;
+                reg_array_output3[i] = 32'h0;
+            end
+
+            for (i = 0; i < 32; i = i + 1) begin
+                pre_pe_scalar_output[i] = 32'h0;
+            end
+            for(i = 0; i < 8; i = i + 1)begin
+                for(j = 0; j < 64; j = j + 1)begin
+                    pre_pe_array_output[i][j] = 32'h0;
+                end
+            end
+        end
+    end
+end
 
 always@(*) begin:handle_input
     integer i;
@@ -239,10 +277,10 @@ always@(*) begin:handle_input
     all_is_save_cu_out[i] = Is_save_cu_out;
 end
 
-assign Scalar_output0 = reg_scalar_output[0];
-assign Scalar_output1 = reg_scalar_output[1];
-assign Scalar_output2 = reg_scalar_output[2];
-assign Scalar_output3 = reg_scalar_output[3];
+assign Scalar_output0 = reg_scalar_output[0] > 0 ? reg_scalar_output[0] : 32'hxxxx_xxxx;
+assign Scalar_output1 = reg_scalar_output[1] > 0 ? reg_scalar_output[1] : 32'hxxxx_xxxx;
+assign Scalar_output2 = reg_scalar_output[2] > 0 ? reg_scalar_output[2] : 32'hxxxx_xxxx;
+assign Scalar_output3 = reg_scalar_output[3] > 0 ? reg_scalar_output[3] : 32'hxxxx_xxxx;
 
 assign Out0_0 = reg_array_output0[0];
 assign Out0_1 = reg_array_output0[1];
@@ -381,27 +419,31 @@ endgenerate
 always @(posedge clk or negedge rst) begin : pe_output_handler
     // save sequence of PE
     integer i, j;
-    // current pe output has been changed or not
-    reg[1:0] is_value_changed;
+    // current pe output has been changed or not , 10表示标量，01表示向量
+    reg[1:0] is_value_changed; // 2'b10表示标量发生变化,2'b01表示向量发生变化
+    integer value_changed_index;   //记录一下值发生变化的位置
     if(!rst)begin
         
     end
     else begin
         is_value_changed = 2'b00;
+        value_changed_index = 0;
         i = 0;
         j = 0;
         for(i = 0; i < 32; i = i + 1)begin
-            if(pre_pe_scalar_output[i] != pe_scalar_output[i])begin
+            if(pre_pe_scalar_output[i] !== pe_scalar_output[i])begin
                 is_value_changed = 2'b10;
                 pre_pe_scalar_output[i] = pe_scalar_output[i];
+                value_changed_index = i;
             end
         end
 
         if(is_value_changed == 2'b00)begin
             for(j = 0 ; j < 64; j = j + 1)begin
-                if(pre_pe_array_output[Col_index][i] != pe_array_output[Col_index][i])begin
+                if(pre_pe_array_output[Col_index][i] !== pe_array_output[Col_index][i])begin
                     is_value_changed = 2'b01;
                     pre_pe_array_output[Col_index][j] = pe_array_output[Col_index][j];
+                    value_changed_index = i;
                 end
             end   
         end
@@ -447,10 +489,11 @@ always @(posedge clk or negedge rst) begin : pe_output_handler
                 //case ASD or aSD or ASS or aSS, 输出一行PE的结果 output row PE's result
                 4'b1001, 4'b1010: begin
                     if(is_value_changed == 2'b10)begin
-                        row_pe_scalar[0] = (pe_scalar_output[Col_index] != 32'hxxxx_xxxx)? row_pe_scalar[0] + pe_scalar_output[Col_index] : row_pe_scalar[0];
-                        row_pe_scalar[1] = (pe_scalar_output[8+Col_index] != 32'hxxxx_xxxx)? row_pe_scalar[1] + pe_scalar_output[8+Col_index] : row_pe_scalar[1];
-                        row_pe_scalar[2] = (pe_scalar_output[16+Col_index] != 32'hxxxx_xxxx)? row_pe_scalar[2] + pe_scalar_output[16+Col_index] : row_pe_scalar[2];
-                        row_pe_scalar[3] = (pe_scalar_output[24+Col_index] != 32'hxxxx_xxxx)? row_pe_scalar[3] + pe_scalar_output[24+Col_index] : row_pe_scalar[3];
+                        //TODO 这里如果pe_scalar_output[7]有数值，那么到下一个clk上升沿的时候，如果is_value_changed 标记为2'b10，就会累加pe_scalar_output[7]，哪怕pe_scalar_output[7]没有任何变化，这里不合理
+                        row_pe_scalar[0] = (pe_scalar_output[Col_index] !== 32'hxxxx_xxxx)? row_pe_scalar[0] + pe_scalar_output[Col_index] : row_pe_scalar[0];
+                        row_pe_scalar[1] = (pe_scalar_output[8+Col_index] !== 32'hxxxx_xxxx)? row_pe_scalar[1] + pe_scalar_output[8+Col_index] : row_pe_scalar[1];
+                        row_pe_scalar[2] = (pe_scalar_output[16+Col_index] !== 32'hxxxx_xxxx)? row_pe_scalar[2] + pe_scalar_output[16+Col_index] : row_pe_scalar[2];
+                        row_pe_scalar[3] = (pe_scalar_output[24+Col_index] !== 32'hxxxx_xxxx)? row_pe_scalar[3] + pe_scalar_output[24+Col_index] : row_pe_scalar[3];
                     end else if(is_value_changed == 2'b01)begin
                         for (i = 0; i < 16; i = i + 1) begin
                             row_pe_array0[i] = row_pe_array0[i] + pe_array_output[Col_index][i];
@@ -463,25 +506,25 @@ always @(posedge clk or negedge rst) begin : pe_output_handler
                     if(Col_index == 3'b111)begin
                         // 这一步是ASD或ASS都要执行的
                         if(is_value_changed == 2'b10)begin
-                            reg_scalar_output[0] = row_pe_scalar[0];
-                            reg_scalar_output[1] = row_pe_scalar[1];
-                            reg_scalar_output[2] = row_pe_scalar[2];
-                            reg_scalar_output[3] = row_pe_scalar[3];
-                            //这一步是只有ASS要执行的
-                            if({Sum_row_pe, Sum_column_pe} == 4'b1010)begin
+                            if({Sum_row_pe, Sum_column_pe} == 4'b1001)begin    //这一步是ASD要执行的
+                                reg_scalar_output[0] = row_pe_scalar[0];
+                                reg_scalar_output[1] = row_pe_scalar[1];
+                                reg_scalar_output[2] = row_pe_scalar[2];
+                                reg_scalar_output[3] = row_pe_scalar[3];
+                            end else if({Sum_row_pe, Sum_column_pe} == 4'b1010)begin  //这一步是ASS要执行的
                                 // Scalar_output0 输出所有PE标量之和
-                                reg_scalar_output[0] = reg_scalar_output[0] + reg_scalar_output[1] + reg_scalar_output[2] + reg_scalar_output[3];
+                                reg_scalar_output[0] = row_pe_scalar[0] + row_pe_scalar[1] + row_pe_scalar[2] + row_pe_scalar[3];
                             end
                         end else if(is_value_changed == 2'b01)begin
                             for (i = 0; i < 16; i = i + 1) begin
-                                reg_array_output0[i] = row_pe_array0[i];
-                                reg_array_output1[i] = row_pe_array1[i];
-                                reg_array_output2[i] = row_pe_array2[i];
-                                reg_array_output3[i] = row_pe_array3[i];
-                                //这一步是只有ASS要执行的
-                                if({Sum_row_pe, Sum_column_pe} == 4'b1010)begin
+                                if({Sum_row_pe, Sum_column_pe} == 4'b1010)begin   //这一步是ASD要执行的
+                                    reg_array_output0[i] = row_pe_array0[i]; 
+                                    reg_array_output1[i] = row_pe_array1[i];
+                                    reg_array_output2[i] = row_pe_array2[i];
+                                    reg_array_output3[i] = row_pe_array3[i];
+                                end else if({Sum_row_pe, Sum_column_pe} == 4'b1010)begin   //这一步是只有ASS要执行的
                                     //Array_output0 输出所有PE向量之和
-                                    reg_array_output0[i] = reg_array_output0[i] + reg_array_output1[i] + reg_array_output2[i] + reg_array_output3[i];
+                                    reg_array_output0[i] = row_pe_array0[i] + row_pe_array1[i] + reg_array_output2[i] + row_pe_array3[i];
                                 end
                             end
                         end

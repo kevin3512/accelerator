@@ -5,5 +5,5 @@
 ./PE.v
 ./PE_array.v
 ./sort_relu.v
-./MLB.sv
-./test_case/PE_tb.v
+./MLB.v
+./sv/test_knn.sv

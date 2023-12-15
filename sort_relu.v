@@ -27,7 +27,7 @@ always @(in)begin:compare
         if(is_start)begin
             for(i = 0; i < K; i = i + 1)begin
                 if(flag == 0)begin
-                    if(value[i] == 32'hxxxx_xxxx || (asce && in < value[i])  || (!asce && in > value[i]))begin
+                    if(value[i] === 32'hxxxx_xxxx || (asce && in < value[i])  || (!asce && in > value[i]))begin
                         temp1_value = value[i];
                         value[i] = in;
                         temp1_index = value_index[i];

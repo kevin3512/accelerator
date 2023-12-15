@@ -15,7 +15,7 @@ clean  :
 	 rm  -rf  *~  core  csrc  simv*  vc_hdrs.h  ucli.key  urg* *.log  novas.* *.fsdb* verdiLog  64* DVEfiles *.vpd
 #-------------------------------------------------------------------------------------------------------
 cp     :
-	cp -rf /mnt/hgfs/Verilog\ workspace/accelerator/ ../../
+	cp -rf /mnt/hgfs/Verilog\ workspace/accelerator/ ../
 #-------------------------------------------------------------------------------------------------------
 
 
