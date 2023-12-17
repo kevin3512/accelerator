@@ -5,7 +5,8 @@ module sort_relu(
     input[31:0]     in,
     input[31:0]     index,
     input           asce,   //升序排序信号，1表示升序（从小到大排列），0表示降序
-    input           is_start     //是否可以开始
+    input           is_start,     //是否可以开始
+    input           clear_reg
 );
 parameter K = 8;
 reg[31:0] value_index[K-1:0];   //保存的当前最大/小值的下标
@@ -15,6 +16,19 @@ reg [31:0] temp2_value;
 reg [31:0] temp1_index; 
 reg [31:0] temp2_index;
 
+always @(posedge clk or negedge rst) begin : clear_sort_reg   //将当前所有保存的寄存器清除
+    if(!rst)begin
+
+    end else begin
+        if(clear_reg)begin
+            for(integer i = 0 ; i < K ; i = i + 1)begin
+                value[i] = 32'hxxxx_xxxx;
+                value_index[i] = 32'hxxxx_xxxx;
+            end
+        end
+        
+    end
+end
 
 always @(in)begin:compare
     integer i;

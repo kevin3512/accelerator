@@ -30,12 +30,14 @@ module test_knn;
     reg[7:0]          test_images[TEST_IMAGE_NUM-1:0][IMAGE_SIZE-1:0];
     reg[7:0]          test_labels[TEST_IMAGE_NUM-1:0]; 
 
-    integer           img_index;
+    integer           img_index;  //测试用例（测试集）下标
+    integer           ref_index;  //参考用例（训练集）下标
 
     reg[31:0]         mem_data[BUFFER_SIZE-1:0];   //4块buff的总长
     reg               read_en;
     reg[1:0]          write_en;
-    reg[4:0]          sel_pe[3:0];     //一列PE对应MLB的4个控制信号 
+    reg[4:0]          sel_pe[4:0];     //一列PE对应MLB的4个控制信号 
+    reg               clear_reg_sort;   //清除排序模块内部寄存器数据
 
     wire[31:0]        wire_in[63:0];    //MLB 和 PE_array直连   
     wire[31:0]        wire_par[63:0];  //MLB 和 PE_array直连
@@ -193,7 +195,12 @@ module test_knn;
         .Out3_0(out[3][0]), .Out3_1(out[3][1]), .Out3_2(out[3][2]), .Out3_3(out[3][3]), .Out3_4(out[3][4]), .Out3_5(out[3][5]), .Out3_6(out[3][6]), .Out3_7(out[3][7]), .Out3_8(out[3][8]), .Out3_9(out[3][9]), .Out3_10(out[3][10]), .Out3_11(out[3][11]), .Out3_12(out[3][12]), .Out3_13(out[3][13]), .Out3_14(out[3][14]), .Out3_15(out[3][15])
     );
 
-    sort_relu sort_isnt(.clk(clk), .rst(rst), .in(scalar_output[0]), .index(img_index), .asce(1'b1), .is_start(1'b1));
+    //累加模块
+
+    //排序模块
+    sort_relu sort_isnt(.clk(clk), .rst(rst), .in(scalar_output[0]), .index(ref_index), .asce(1'b1), .is_start(1'b1), .clear_reg(clear_reg_sort)); 
+
+    //输出保存
 
     initial begin
         $fsdbDumpfile("tb.fsdb");
@@ -361,76 +368,90 @@ module test_knn;
         // 从数据集中读取文件到内存
         read_mnist_dataset_task(ref_images, ref_labels, test_images, test_labels);
         $display("读取到训练集图片最后一个字节(第%d个)为%h" ,REF_IMAGE_NUM, ref_images[REF_IMAGE_NUM-1][IMAGE_SIZE-1]);
+        $display("读取到测试集图片最后一个字节(第%d个)为%h" ,TEST_IMAGE_NUM, test_images[TEST_IMAGE_NUM-1][IMAGE_SIZE-1]);
         //测试用例数量10000
-        for (img_index = 0; img_index < 100; img_index = img_index + 1)begin
+        for (img_index = 0; img_index < 10; img_index = img_index + 1)begin
             $display("正在计算第%d个图片的分类结果", img_index+1);
             write_en = 1;
             read_en = 0;
-            sel_pe[0] = 0;
-            sel_pe[1] = 8;
-            sel_pe[2] = 16;
-            sel_pe[3] = 24;
-            mlb_block_in = 0;
+            sel_pe[0] = 5'b00000;
+            sel_pe[1] = 5'b01000;
+            sel_pe[2] = 5'b10000;
+            sel_pe[3] = 5'b11000;
+            mlb_block_in = 0;   
             mlb_block_par = 0;
+            //清除一下上一张测试图片保留的排序模块的寄存器数据
+            clear_reg_sort = 1;
+            #2
+            clear_reg_sort = 0;
+            //TODO 这一块往MLB里面写数据估计有点问题，或者就是读数据有问题
             // 将两张图片写入到MLB中
             for(integer j = 0; j < 784; j = j + 64)begin
                 //向4块MLB中写入2张图片数据（一张图片(784)占据2个MLB的容量(512)）
                 for(integer k = j; k < (j + 64); k = k + 1)begin  // 一个PE控制信号需要对应16个输入数据
                     if(k < 784)begin  //到第13次循环的时候，会存在k大于784的情况，因为784/64=12.25,会存在第13次只给MLB0赋值的情况
-                        wire_mem_in[k] = ref_images[img_index][k];
-                        wire_mem_in[1024+k] = ref_images[img_index+1][k];
+                        wire_mem_in[k] = test_images[img_index][k];
+                        wire_mem_in[1024+k] = test_images[img_index+1][k];
                     end
                 end
                 #2
-                sel_pe[0] = sel_pe[0] + 1;
-                sel_pe[1] = sel_pe[1] + 1;
-                sel_pe[2] = sel_pe[2] + 1;
-                sel_pe[3] = sel_pe[3] + 1;
-                if(sel_pe[0] >= 8)begin
-                    sel_pe[0] = 0;
+                if(sel_pe[0] >= 5'b00111)begin
+                    sel_pe[0] = 5'b00000;
+                end else begin
+                    sel_pe[0] = sel_pe[0] + 1;
                 end
-                if(sel_pe[1] >= 16)begin
-                    sel_pe[1] = 0;
+                if(sel_pe[1] >= 5'b01111)begin
+                    sel_pe[1] = 5'b01000;
+                end else begin
+                    sel_pe[1] = sel_pe[1] + 1;
                 end
-                if(sel_pe[2] >= 24)begin
-                    sel_pe[2] = 0;
+                if(sel_pe[2] >= 5'b10111)begin
+                    sel_pe[2] = 5'b10000;
+                end else begin
+                    sel_pe[2] = sel_pe[2] + 1;
                 end
-                if(sel_pe[3] >= 32)begin
-                    sel_pe[3] = 0;
+                if(sel_pe[3] >= 5'b11111)begin
+                    sel_pe[3] = 5'b11000;
+                end else begin
+                    sel_pe[3] = sel_pe[3] + 1;
                 end
             end
             // 参考用例数量 60000
-            for(integer i = 0; i < 60; i = i + 2)begin  //一个循环读取2张图片
+            for(ref_index = 0; ref_index < 60; ref_index = ref_index + 2)begin  //一个循环读取2张图片
                 //把2张参考用例图片数据写入到MLB，从内存读取数据到MLB
                 write_en = 1;
                 read_en = 0;
-                sel_pe[0] = 0;
-                sel_pe[1] = 8;
-                sel_pe[2] = 16;
-                sel_pe[3] = 24;
-                for(integer j = 0; j < 784; j = j + 64)begin
-                    for(integer k = j; k < (j + 64); k = k + 1)begin  // 一个PE控制信号需要对应16个输入数据
-                        if(k < 784)begin  //到第13次循环的时候，会存在k大于784的情况，因为784/64=12.25,会存在第13次只给MLB0赋值的情况
-                            wire_mem_par[k] = ref_images[img_index][k];
-                            wire_mem_par[1024+k] = ref_images[img_index+1][k];
+                sel_pe[0] = 5'b00000;
+                sel_pe[1] = 5'b01000;
+                sel_pe[2] = 5'b10000;
+                sel_pe[3] = 5'b11000;
+                for(integer x = 0; x < 784; x = x + 64)begin
+                    for(integer y = x; y < (x + 64); y = y + 1)begin  // 一个PE控制信号需要对应16个输入数据
+                        if(y < 784)begin  //到第13次循环的时候，会存在k大于784的情况，因为784/64=12.25,会存在第13次只给MLB0赋值的情况
+                            wire_mem_par[y] = ref_images[ref_index][y];
+                            wire_mem_par[1024+y] = ref_images[ref_index+1][y];
                         end
                     end
                     #2
-                    sel_pe[0] = sel_pe[0] + 1;
-                    sel_pe[1] = sel_pe[1] + 1;
-                    sel_pe[2] = sel_pe[2] + 1;
-                    sel_pe[3] = sel_pe[3] + 1;
-                    if(sel_pe[0] >= 8)begin
-                        sel_pe[0] = 0;
+                    if(sel_pe[0] >= 5'b00111)begin
+                        sel_pe[0] = 5'b00000;
+                    end else begin
+                        sel_pe[0] = sel_pe[0] + 1;
                     end
-                    if(sel_pe[1] >= 16)begin
-                        sel_pe[1] = 0;
+                    if(sel_pe[1] >= 5'b01111)begin
+                        sel_pe[1] = 5'b01000;
+                    end else begin
+                        sel_pe[1] = sel_pe[1] + 1;
                     end
-                    if(sel_pe[2] >= 24)begin
-                        sel_pe[2] = 0;
+                    if(sel_pe[2] >= 5'b10111)begin
+                        sel_pe[2] = 5'b10000;
+                    end else begin
+                        sel_pe[2] = sel_pe[2] + 1;
                     end
-                    if(sel_pe[3] >= 32)begin
-                        sel_pe[3] = 0;
+                    if(sel_pe[3] >= 5'b11111)begin
+                        sel_pe[3] = 5'b11000;
+                    end else begin
+                        sel_pe[3] = sel_pe[3] + 1;
                     end
                 end
                 write_en = 0;
@@ -440,8 +461,8 @@ module test_knn;
                 sum_column_pe = 2'b10;  //column select sum of column PE
                 is_save_cu_out = 4'b0000;
                 clear_reg = 1'b0;  //reset last time running value 1
-                for (integer i = 0; i < 8; i = i + 1)begin
-                    col_index = i[2:0];
+                for (integer z = 0; z < 8; z = z + 1)begin
+                    col_index = z[2:0];
                     sel_pe[0] = col_index;
                     sel_pe[1] = col_index + 8;
                     sel_pe[2] = col_index + 16;

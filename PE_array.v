@@ -277,6 +277,7 @@ always@(*) begin:handle_input
     all_is_save_cu_out[i] = Is_save_cu_out;
 end
 
+// 不能输出0，为了防止初始化reg_scalar_output为0时，直接被输出，从而影响排序结果（因为0总是最小的距离）
 assign Scalar_output0 = reg_scalar_output[0] > 0 ? reg_scalar_output[0] : 32'hxxxx_xxxx;
 assign Scalar_output1 = reg_scalar_output[1] > 0 ? reg_scalar_output[1] : 32'hxxxx_xxxx;
 assign Scalar_output2 = reg_scalar_output[2] > 0 ? reg_scalar_output[2] : 32'hxxxx_xxxx;
