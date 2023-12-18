@@ -6,4 +6,5 @@
 ./PE_array.v
 ./sort_relu.v
 ./MLB.v
+./acc_out.v
 ./sv/test_knn.sv

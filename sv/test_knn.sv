@@ -33,18 +33,25 @@ module test_knn;
     integer           img_index;  //测试用例（测试集）下标
     integer           ref_index;  //参考用例（训练集）下标
 
+    //排序模块需要
     reg[31:0]         mem_data[BUFFER_SIZE-1:0];   //4块buff的总长
     reg               read_en;
     reg[1:0]          write_en;
-    reg[4:0]          sel_pe[4:0];     //一列PE对应MLB的4个控制信号 
     reg               clear_reg_sort;   //清除排序模块内部寄存器数据
+    integer           sort_ref_index;
 
     wire[31:0]        wire_in[63:0];    //MLB 和 PE_array直连   
     wire[31:0]        wire_par[63:0];  //MLB 和 PE_array直连
     reg[31:0]         wire_mem_in[2047:0];  //MLB和内存直连，从内存读数据到MLB，总共4块tile，每块512
     reg[31:0]         wire_mem_par[2047:0];
-    reg[1:0]          mlb_block_in;    //MLB第几块，共4块
-    reg[1:0]          mlb_block_par;    //MLB第几块，共4块
+    reg[1:0]          pe_array_num;    //表示第几组提供给pe_array的数据（0~3）
+
+    //acc累加模块需要的信号
+    reg[2:0]          acc_sig;
+    reg               acc_is_stop; 
+    reg               clear_reg_acc;
+    wire[31:0]        acc_scalar_output;
+    
 
     //Input buffer
     MLB mlb_in0 (  
@@ -52,11 +59,12 @@ module test_knn;
         .rst(rst),
         .read_en(read_en),
         .write_en(write_en),
-        .sel_pe(sel_pe[0]),
-        .in0(wire_mem_in[mlb_block_in*512+col_index*64]), .in1(wire_mem_in[mlb_block_in*512+col_index*64+1]), .in2(wire_mem_in[mlb_block_in*512+col_index*64+2]), .in3(wire_mem_in[mlb_block_in*512+col_index*64+3]),
-            .in4(wire_mem_in[mlb_block_in*512+col_index*64+4]),  .in5(wire_mem_in[mlb_block_in*512+col_index*64+5]), .in6(wire_mem_in[mlb_block_in*512+col_index*64+6]), .in7(wire_mem_in[mlb_block_in*512+col_index*64+7]),
-                .in8(wire_mem_in[mlb_block_in*512+col_index*64+8]), .in9(wire_mem_in[mlb_block_in*512+col_index*64+9]), .in10(wire_mem_in[mlb_block_in*512+col_index*64+10]), .in11(wire_mem_in[mlb_block_in*512+col_index*64+11]),
-                    .in12(wire_mem_in[mlb_block_in*512+col_index*64+12]), .in13(wire_mem_in[mlb_block_in*512+col_index*64+13]), .in14(wire_mem_in[mlb_block_in*512+col_index*64+14]), .in15(wire_mem_in[mlb_block_in*512+col_index*64+15]), 
+        .sub_tile_idx(pe_array_num),
+        .unit_tile_idx(col_index),
+        .in0(wire_mem_in[pe_array_num*512+col_index*64]), .in1(wire_mem_in[pe_array_num*512+col_index*64+1]), .in2(wire_mem_in[pe_array_num*512+col_index*64+2]), .in3(wire_mem_in[pe_array_num*512+col_index*64+3]),
+            .in4(wire_mem_in[pe_array_num*512+col_index*64+4]),  .in5(wire_mem_in[pe_array_num*512+col_index*64+5]), .in6(wire_mem_in[pe_array_num*512+col_index*64+6]), .in7(wire_mem_in[pe_array_num*512+col_index*64+7]),
+                .in8(wire_mem_in[pe_array_num*512+col_index*64+8]), .in9(wire_mem_in[pe_array_num*512+col_index*64+9]), .in10(wire_mem_in[pe_array_num*512+col_index*64+10]), .in11(wire_mem_in[pe_array_num*512+col_index*64+11]),
+                    .in12(wire_mem_in[pe_array_num*512+col_index*64+12]), .in13(wire_mem_in[pe_array_num*512+col_index*64+13]), .in14(wire_mem_in[pe_array_num*512+col_index*64+14]), .in15(wire_mem_in[pe_array_num*512+col_index*64+15]), 
         .out0(wire_in[0]), .out1(wire_in[1]), .out2(wire_in[2]), .out3(wire_in[3]), .out4(wire_in[4]), 
             .out5(wire_in[5]), .out6(wire_in[6]), .out7(wire_in[7]), .out8(wire_in[8]), .out9(wire_in[9]), 
                 .out10(wire_in[10]), .out11(wire_in[11]), .out12(wire_in[12]), .out13(wire_in[13]),.out14(wire_in[14]), .out15(wire_in[15])
@@ -68,11 +76,12 @@ module test_knn;
         .rst(rst),
         .read_en(read_en),
         .write_en(write_en),
-        .sel_pe(sel_pe[1]),
-        .in0(wire_mem_in[mlb_block_in*512+col_index*64+16]), .in1(wire_mem_in[mlb_block_in*512+col_index*64+17]), .in2(wire_mem_in[mlb_block_in*512+col_index*64+18]), .in3(wire_mem_in[mlb_block_in*512+col_index*64+19]),
-            .in4(wire_mem_in[mlb_block_in*512+col_index*64+20]),  .in5(wire_mem_in[mlb_block_in*512+col_index*64+21]), .in6(wire_mem_in[mlb_block_in*512+col_index*64+22]), .in7(wire_mem_in[mlb_block_in*512+col_index*64+23]),
-                .in8(wire_mem_in[mlb_block_in*512+col_index*64+24]), .in9(wire_mem_in[mlb_block_in*512+col_index*64+25]), .in10(wire_mem_in[mlb_block_in*512+col_index*64+26]), .in11(wire_mem_in[mlb_block_in*512+col_index*64+27]),
-                    .in12(wire_mem_in[mlb_block_in*512+col_index*64+28]), .in13(wire_mem_in[mlb_block_in*512+col_index*64+29]), .in14(wire_mem_in[mlb_block_in*512+col_index*64+30]), .in15(wire_mem_in[mlb_block_in*512+col_index*64+31]), 
+        .sub_tile_idx(pe_array_num),
+        .unit_tile_idx(col_index),
+        .in0(wire_mem_in[pe_array_num*512+col_index*64+16]), .in1(wire_mem_in[pe_array_num*512+col_index*64+17]), .in2(wire_mem_in[pe_array_num*512+col_index*64+18]), .in3(wire_mem_in[pe_array_num*512+col_index*64+19]),
+            .in4(wire_mem_in[pe_array_num*512+col_index*64+20]),  .in5(wire_mem_in[pe_array_num*512+col_index*64+21]), .in6(wire_mem_in[pe_array_num*512+col_index*64+22]), .in7(wire_mem_in[pe_array_num*512+col_index*64+23]),
+                .in8(wire_mem_in[pe_array_num*512+col_index*64+24]), .in9(wire_mem_in[pe_array_num*512+col_index*64+25]), .in10(wire_mem_in[pe_array_num*512+col_index*64+26]), .in11(wire_mem_in[pe_array_num*512+col_index*64+27]),
+                    .in12(wire_mem_in[pe_array_num*512+col_index*64+28]), .in13(wire_mem_in[pe_array_num*512+col_index*64+29]), .in14(wire_mem_in[pe_array_num*512+col_index*64+30]), .in15(wire_mem_in[pe_array_num*512+col_index*64+31]), 
         .out0(wire_in[16]), .out1(wire_in[17]), .out2(wire_in[18]), .out3(wire_in[19]), .out4(wire_in[20]), 
             .out5(wire_in[21]), .out6(wire_in[22]), .out7(wire_in[23]), .out8(wire_in[24]), .out9(wire_in[25]), 
                 .out10(wire_in[26]), .out11(wire_in[27]), .out12(wire_in[28]), .out13(wire_in[29]),.out14(wire_in[30]), .out15(wire_in[31])
@@ -83,11 +92,12 @@ module test_knn;
         .rst(rst),
         .read_en(read_en),
         .write_en(write_en),
-        .sel_pe(sel_pe[2]),
-        .in0(wire_mem_in[mlb_block_in*512+col_index*64+32]), .in1(wire_mem_in[mlb_block_in*512+col_index*64+33]), .in2(wire_mem_in[mlb_block_in*512+col_index*64+34]), .in3(wire_mem_in[mlb_block_in*512+col_index*64+35]),
-            .in4(wire_mem_in[mlb_block_in*512+col_index*64+36]),  .in5(wire_mem_in[mlb_block_in*512+col_index*64+37]), .in6(wire_mem_in[mlb_block_in*512+col_index*64+38]), .in7(wire_mem_in[mlb_block_in*512+col_index*64+39]),
-                .in8(wire_mem_in[mlb_block_in*512+col_index*64+40]), .in9(wire_mem_in[mlb_block_in*512+col_index*64+41]), .in10(wire_mem_in[mlb_block_in*512+col_index*64+42]), .in11(wire_mem_in[mlb_block_in*512+col_index*64+43]),
-                    .in12(wire_mem_in[mlb_block_in*512+col_index*64+44]), .in13(wire_mem_in[mlb_block_in*512+col_index*64+45]), .in14(wire_mem_in[mlb_block_in*512+col_index*64+46]), .in15(wire_mem_in[mlb_block_in*512+col_index*64+47]), 
+        .sub_tile_idx(pe_array_num),
+        .unit_tile_idx(col_index),
+        .in0(wire_mem_in[pe_array_num*512+col_index*64+32]), .in1(wire_mem_in[pe_array_num*512+col_index*64+33]), .in2(wire_mem_in[pe_array_num*512+col_index*64+34]), .in3(wire_mem_in[pe_array_num*512+col_index*64+35]),
+            .in4(wire_mem_in[pe_array_num*512+col_index*64+36]),  .in5(wire_mem_in[pe_array_num*512+col_index*64+37]), .in6(wire_mem_in[pe_array_num*512+col_index*64+38]), .in7(wire_mem_in[pe_array_num*512+col_index*64+39]),
+                .in8(wire_mem_in[pe_array_num*512+col_index*64+40]), .in9(wire_mem_in[pe_array_num*512+col_index*64+41]), .in10(wire_mem_in[pe_array_num*512+col_index*64+42]), .in11(wire_mem_in[pe_array_num*512+col_index*64+43]),
+                    .in12(wire_mem_in[pe_array_num*512+col_index*64+44]), .in13(wire_mem_in[pe_array_num*512+col_index*64+45]), .in14(wire_mem_in[pe_array_num*512+col_index*64+46]), .in15(wire_mem_in[pe_array_num*512+col_index*64+47]), 
         .out0(wire_in[32]), .out1(wire_in[33]), .out2(wire_in[34]), .out3(wire_in[35]), .out4(wire_in[36]), 
             .out5(wire_in[37]), .out6(wire_in[38]), .out7(wire_in[39]), .out8(wire_in[40]), .out9(wire_in[41]), 
                 .out10(wire_in[42]), .out11(wire_in[43]), .out12(wire_in[44]), .out13(wire_in[45]),.out14(wire_in[46]), .out15(wire_in[47])
@@ -97,11 +107,12 @@ module test_knn;
         .rst(rst),
         .read_en(read_en),
         .write_en(write_en),
-        .sel_pe(sel_pe[3]),
-        .in0(wire_mem_in[mlb_block_in*512+col_index*64+48]), .in1(wire_mem_in[mlb_block_in*512+col_index*64+49]), .in2(wire_mem_in[mlb_block_in*512+col_index*64+50]), .in3(wire_mem_in[mlb_block_in*512+col_index*64+51]),
-            .in4(wire_mem_in[mlb_block_in*512+col_index*64+52]),  .in5(wire_mem_in[mlb_block_in*512+col_index*64+53]), .in6(wire_mem_in[mlb_block_in*512+col_index*64+54]), .in7(wire_mem_in[mlb_block_in*512+col_index*64+55]),
-                .in8(wire_mem_in[mlb_block_in*512+col_index*64+56]), .in9(wire_mem_in[mlb_block_in*512+col_index*64+57]), .in10(wire_mem_in[mlb_block_in*512+col_index*64+58]), .in11(wire_mem_in[mlb_block_in*512+col_index*64+59]),
-                    .in12(wire_mem_in[mlb_block_in*512+col_index*64+60]), .in13(wire_mem_in[mlb_block_in*512+col_index*64+61]), .in14(wire_mem_in[mlb_block_in*512+col_index*64+62]), .in15(wire_mem_in[mlb_block_in*512+col_index*64+63]), 
+        .sub_tile_idx(pe_array_num),
+        .unit_tile_idx(col_index),
+        .in0(wire_mem_in[pe_array_num*512+col_index*64+48]), .in1(wire_mem_in[pe_array_num*512+col_index*64+49]), .in2(wire_mem_in[pe_array_num*512+col_index*64+50]), .in3(wire_mem_in[pe_array_num*512+col_index*64+51]),
+            .in4(wire_mem_in[pe_array_num*512+col_index*64+52]),  .in5(wire_mem_in[pe_array_num*512+col_index*64+53]), .in6(wire_mem_in[pe_array_num*512+col_index*64+54]), .in7(wire_mem_in[pe_array_num*512+col_index*64+55]),
+                .in8(wire_mem_in[pe_array_num*512+col_index*64+56]), .in9(wire_mem_in[pe_array_num*512+col_index*64+57]), .in10(wire_mem_in[pe_array_num*512+col_index*64+58]), .in11(wire_mem_in[pe_array_num*512+col_index*64+59]),
+                    .in12(wire_mem_in[pe_array_num*512+col_index*64+60]), .in13(wire_mem_in[pe_array_num*512+col_index*64+61]), .in14(wire_mem_in[pe_array_num*512+col_index*64+62]), .in15(wire_mem_in[pe_array_num*512+col_index*64+63]), 
         .out0(wire_in[48]), .out1(wire_in[49]), .out2(wire_in[50]), .out3(wire_in[51]), .out4(wire_in[52]), 
             .out5(wire_in[53]), .out6(wire_in[54]), .out7(wire_in[55]), .out8(wire_in[56]), .out9(wire_in[57]), 
                 .out10(wire_in[58]), .out11(wire_in[59]), .out12(wire_in[60]), .out13(wire_in[61]),.out14(wire_in[62]), .out15(wire_in[63])
@@ -114,11 +125,12 @@ module test_knn;
         .rst(rst),
         .read_en(read_en),
         .write_en(write_en),
-        .sel_pe(sel_pe[0]),
-        .in0(wire_mem_par[mlb_block_par*512+col_index*64]), .in1(wire_mem_par[mlb_block_par*512+col_index*64+1]), .in2(wire_mem_par[mlb_block_par*512+col_index*64+2]), .in3(wire_mem_par[mlb_block_par*512+col_index*64+3]),
-            .in4(wire_mem_par[mlb_block_par*512+col_index*64+4]),  .in5(wire_mem_par[mlb_block_par*512+col_index*64+5]), .in6(wire_mem_par[mlb_block_par*512+col_index*64+6]), .in7(wire_mem_par[mlb_block_par*512+col_index*64+7]),
-                .in8(wire_mem_par[mlb_block_par*512+col_index*64+8]), .in9(wire_mem_par[mlb_block_par*512+col_index*64+9]), .in10(wire_mem_par[mlb_block_par*512+col_index*64+10]), .in11(wire_mem_par[mlb_block_par*512+col_index*64+11]),
-                    .in12(wire_mem_par[mlb_block_par*512+col_index*64+12]), .in13(wire_mem_par[mlb_block_par*512+col_index*64+13]), .in14(wire_mem_par[mlb_block_par*512+col_index*64+14]), .in15(wire_mem_par[mlb_block_par*512+col_index*64+15]), 
+        .sub_tile_idx(pe_array_num),
+        .unit_tile_idx(col_index),
+        .in0(wire_mem_par[pe_array_num*512+col_index*64]), .in1(wire_mem_par[pe_array_num*512+col_index*64+1]), .in2(wire_mem_par[pe_array_num*512+col_index*64+2]), .in3(wire_mem_par[pe_array_num*512+col_index*64+3]),
+            .in4(wire_mem_par[pe_array_num*512+col_index*64+4]),  .in5(wire_mem_par[pe_array_num*512+col_index*64+5]), .in6(wire_mem_par[pe_array_num*512+col_index*64+6]), .in7(wire_mem_par[pe_array_num*512+col_index*64+7]),
+                .in8(wire_mem_par[pe_array_num*512+col_index*64+8]), .in9(wire_mem_par[pe_array_num*512+col_index*64+9]), .in10(wire_mem_par[pe_array_num*512+col_index*64+10]), .in11(wire_mem_par[pe_array_num*512+col_index*64+11]),
+                    .in12(wire_mem_par[pe_array_num*512+col_index*64+12]), .in13(wire_mem_par[pe_array_num*512+col_index*64+13]), .in14(wire_mem_par[pe_array_num*512+col_index*64+14]), .in15(wire_mem_par[pe_array_num*512+col_index*64+15]), 
         .out0(wire_par[0]), .out1(wire_par[1]), .out2(wire_par[2]), .out3(wire_par[3]), .out4(wire_par[4]), 
             .out5(wire_par[5]), .out6(wire_par[6]), .out7(wire_par[7]), .out8(wire_par[8]), .out9(wire_par[9]), 
                 .out10(wire_par[10]), .out11(wire_par[11]), .out12(wire_par[12]), .out13(wire_par[13]),.out14(wire_par[14]), .out15(wire_par[15])
@@ -130,11 +142,12 @@ module test_knn;
         .rst(rst),
         .read_en(read_en),
         .write_en(write_en),
-        .sel_pe(sel_pe[1]),
-        .in0(wire_mem_par[mlb_block_par*512+col_index*64+16]), .in1(wire_mem_par[mlb_block_par*512+col_index*64+17]), .in2(wire_mem_par[mlb_block_par*512+col_index*64+18]), .in3(wire_mem_par[mlb_block_par*512+col_index*64+19]),
-            .in4(wire_mem_par[mlb_block_par*512+col_index*64+20]),  .in5(wire_mem_par[mlb_block_par*512+col_index*64+21]), .in6(wire_mem_par[mlb_block_par*512+col_index*64+22]), .in7(wire_mem_par[mlb_block_par*512+col_index*64+23]),
-                .in8(wire_mem_par[mlb_block_par*512+col_index*64+24]), .in9(wire_mem_par[mlb_block_par*512+col_index*64+25]), .in10(wire_mem_par[mlb_block_par*512+col_index*64+26]), .in11(wire_mem_par[mlb_block_par*512+col_index*64+27]),
-                    .in12(wire_mem_par[mlb_block_par*512+col_index*64+28]), .in13(wire_mem_par[mlb_block_par*512+col_index*64+29]), .in14(wire_mem_par[mlb_block_par*512+col_index*64+30]), .in15(wire_mem_par[mlb_block_par*512+col_index*64+31]), 
+        .sub_tile_idx(pe_array_num),
+        .unit_tile_idx(col_index),
+        .in0(wire_mem_par[pe_array_num*512+col_index*64+16]), .in1(wire_mem_par[pe_array_num*512+col_index*64+17]), .in2(wire_mem_par[pe_array_num*512+col_index*64+18]), .in3(wire_mem_par[pe_array_num*512+col_index*64+19]),
+            .in4(wire_mem_par[pe_array_num*512+col_index*64+20]),  .in5(wire_mem_par[pe_array_num*512+col_index*64+21]), .in6(wire_mem_par[pe_array_num*512+col_index*64+22]), .in7(wire_mem_par[pe_array_num*512+col_index*64+23]),
+                .in8(wire_mem_par[pe_array_num*512+col_index*64+24]), .in9(wire_mem_par[pe_array_num*512+col_index*64+25]), .in10(wire_mem_par[pe_array_num*512+col_index*64+26]), .in11(wire_mem_par[pe_array_num*512+col_index*64+27]),
+                    .in12(wire_mem_par[pe_array_num*512+col_index*64+28]), .in13(wire_mem_par[pe_array_num*512+col_index*64+29]), .in14(wire_mem_par[pe_array_num*512+col_index*64+30]), .in15(wire_mem_par[pe_array_num*512+col_index*64+31]), 
         .out0(wire_par[16]), .out1(wire_par[17]), .out2(wire_par[18]), .out3(wire_par[19]), .out4(wire_par[20]), 
             .out5(wire_par[21]), .out6(wire_par[22]), .out7(wire_par[23]), .out8(wire_par[24]), .out9(wire_par[25]), 
                 .out10(wire_par[26]), .out11(wire_par[27]), .out12(wire_par[28]), .out13(wire_par[29]),.out14(wire_par[30]), .out15(wire_par[31])
@@ -145,11 +158,12 @@ module test_knn;
         .rst(rst),
         .read_en(read_en),
         .write_en(write_en),
-        .sel_pe(sel_pe[2]),
-        .in0(wire_mem_par[mlb_block_par*512+col_index*64+32]), .in1(wire_mem_par[mlb_block_par*512+col_index*64+33]), .in2(wire_mem_par[mlb_block_par*512+col_index*64+34]), .in3(wire_mem_par[mlb_block_par*512+col_index*64+35]),
-            .in4(wire_mem_par[mlb_block_par*512+col_index*64+36]),  .in5(wire_mem_par[mlb_block_par*512+col_index*64+37]), .in6(wire_mem_par[mlb_block_par*512+col_index*64+38]), .in7(wire_mem_par[mlb_block_par*512+col_index*64+39]),
-                .in8(wire_mem_par[mlb_block_par*512+col_index*64+40]), .in9(wire_mem_par[mlb_block_par*512+col_index*64+41]), .in10(wire_mem_par[mlb_block_par*512+col_index*64+42]), .in11(wire_mem_par[mlb_block_par*512+col_index*64+43]),
-                    .in12(wire_mem_par[mlb_block_par*512+col_index*64+44]), .in13(wire_mem_par[mlb_block_par*512+col_index*64+45]), .in14(wire_mem_par[mlb_block_par*512+col_index*64+46]), .in15(wire_mem_par[mlb_block_par*512+col_index*64+47]), 
+        .sub_tile_idx(pe_array_num),
+        .unit_tile_idx(col_index),
+        .in0(wire_mem_par[pe_array_num*512+col_index*64+32]), .in1(wire_mem_par[pe_array_num*512+col_index*64+33]), .in2(wire_mem_par[pe_array_num*512+col_index*64+34]), .in3(wire_mem_par[pe_array_num*512+col_index*64+35]),
+            .in4(wire_mem_par[pe_array_num*512+col_index*64+36]),  .in5(wire_mem_par[pe_array_num*512+col_index*64+37]), .in6(wire_mem_par[pe_array_num*512+col_index*64+38]), .in7(wire_mem_par[pe_array_num*512+col_index*64+39]),
+                .in8(wire_mem_par[pe_array_num*512+col_index*64+40]), .in9(wire_mem_par[pe_array_num*512+col_index*64+41]), .in10(wire_mem_par[pe_array_num*512+col_index*64+42]), .in11(wire_mem_par[pe_array_num*512+col_index*64+43]),
+                    .in12(wire_mem_par[pe_array_num*512+col_index*64+44]), .in13(wire_mem_par[pe_array_num*512+col_index*64+45]), .in14(wire_mem_par[pe_array_num*512+col_index*64+46]), .in15(wire_mem_par[pe_array_num*512+col_index*64+47]), 
         .out0(wire_par[32]), .out1(wire_par[33]), .out2(wire_par[34]), .out3(wire_par[35]), .out4(wire_par[36]), 
             .out5(wire_par[37]), .out6(wire_par[38]), .out7(wire_par[39]), .out8(wire_par[40]), .out9(wire_par[41]), 
                 .out10(wire_par[42]), .out11(wire_par[43]), .out12(wire_par[44]), .out13(wire_par[45]),.out14(wire_par[46]), .out15(wire_par[47])
@@ -159,11 +173,12 @@ module test_knn;
         .rst(rst),
         .read_en(read_en),
         .write_en(write_en),
-        .sel_pe(sel_pe[3]),
-        .in0(wire_mem_par[mlb_block_par*512+col_index*64+48]), .in1(wire_mem_par[mlb_block_par*512+col_index*64+49]), .in2(wire_mem_par[mlb_block_par*512+col_index*64+50]), .in3(wire_mem_par[mlb_block_par*512+col_index*64+51]),
-            .in4(wire_mem_par[mlb_block_par*512+col_index*64+52]),  .in5(wire_mem_par[mlb_block_par*512+col_index*64+53]), .in6(wire_mem_par[mlb_block_par*512+col_index*64+54]), .in7(wire_mem_par[mlb_block_par*512+col_index*64+55]),
-                .in8(wire_mem_par[mlb_block_par*512+col_index*64+56]), .in9(wire_mem_par[mlb_block_par*512+col_index*64+57]), .in10(wire_mem_par[mlb_block_par*512+col_index*64+58]), .in11(wire_mem_par[mlb_block_par*512+col_index*64+59]),
-                    .in12(wire_mem_par[mlb_block_par*512+col_index*64+60]), .in13(wire_mem_par[mlb_block_par*512+col_index*64+61]), .in14(wire_mem_par[mlb_block_par*512+col_index*64+62]), .in15(wire_mem_par[mlb_block_par*512+col_index*64+63]), 
+        .sub_tile_idx(pe_array_num),
+        .unit_tile_idx(col_index),
+        .in0(wire_mem_par[pe_array_num*512+col_index*64+48]), .in1(wire_mem_par[pe_array_num*512+col_index*64+49]), .in2(wire_mem_par[pe_array_num*512+col_index*64+50]), .in3(wire_mem_par[pe_array_num*512+col_index*64+51]),
+            .in4(wire_mem_par[pe_array_num*512+col_index*64+52]),  .in5(wire_mem_par[pe_array_num*512+col_index*64+53]), .in6(wire_mem_par[pe_array_num*512+col_index*64+54]), .in7(wire_mem_par[pe_array_num*512+col_index*64+55]),
+                .in8(wire_mem_par[pe_array_num*512+col_index*64+56]), .in9(wire_mem_par[pe_array_num*512+col_index*64+57]), .in10(wire_mem_par[pe_array_num*512+col_index*64+58]), .in11(wire_mem_par[pe_array_num*512+col_index*64+59]),
+                    .in12(wire_mem_par[pe_array_num*512+col_index*64+60]), .in13(wire_mem_par[pe_array_num*512+col_index*64+61]), .in14(wire_mem_par[pe_array_num*512+col_index*64+62]), .in15(wire_mem_par[pe_array_num*512+col_index*64+63]), 
         .out0(wire_par[48]), .out1(wire_par[49]), .out2(wire_par[50]), .out3(wire_par[51]), .out4(wire_par[52]), 
             .out5(wire_par[53]), .out6(wire_par[54]), .out7(wire_par[55]), .out8(wire_par[56]), .out9(wire_par[57]), 
                 .out10(wire_par[58]), .out11(wire_par[59]), .out12(wire_par[60]), .out13(wire_par[61]),.out14(wire_par[62]), .out15(wire_par[63])
@@ -196,13 +211,14 @@ module test_knn;
     );
 
     //累加模块
+    acc_out acc_inst(.clk(clk), .rst(rst), .sig(acc_sig), .data(scalar_output[0]), .isStop(acc_is_stop), .out(acc_scalar_output), .clear_reg(clear_reg_acc));
 
     //排序模块
-    sort_relu sort_isnt(.clk(clk), .rst(rst), .in(scalar_output[0]), .index(ref_index), .asce(1'b1), .is_start(1'b1), .clear_reg(clear_reg_sort)); 
+    sort_relu sort_isnt(.clk(clk), .rst(rst), .in(acc_scalar_output), .index(sort_ref_index), .asce(1'b1), .is_start(1'b1), .clear_reg(clear_reg_sort)); 
 
     //输出保存
 
-    initial begin
+    initial begin              
         $fsdbDumpfile("tb.fsdb");
         $fsdbDumpvars(0);
         $fsdbDumpMDA();
@@ -370,121 +386,110 @@ module test_knn;
         $display("读取到训练集图片最后一个字节(第%d个)为%h" ,REF_IMAGE_NUM, ref_images[REF_IMAGE_NUM-1][IMAGE_SIZE-1]);
         $display("读取到测试集图片最后一个字节(第%d个)为%h" ,TEST_IMAGE_NUM, test_images[TEST_IMAGE_NUM-1][IMAGE_SIZE-1]);
         //测试用例数量10000
+        //------------------------------------------向MLB写数据start-------------------------------------------
         for (img_index = 0; img_index < 10; img_index = img_index + 1)begin
             $display("正在计算第%d个图片的分类结果", img_index+1);
+            acc_is_stop = 0;
             write_en = 1;
             read_en = 0;
-            sel_pe[0] = 5'b00000;
-            sel_pe[1] = 5'b01000;
-            sel_pe[2] = 5'b10000;
-            sel_pe[3] = 5'b11000;
-            mlb_block_in = 0;   
-            mlb_block_par = 0;
             //清除一下上一张测试图片保留的排序模块的寄存器数据
             clear_reg_sort = 1;
             #2
             clear_reg_sort = 0;
-            //TODO 这一块往MLB里面写数据估计有点问题，或者就是读数据有问题
-            // 将两张图片写入到MLB中
-            for(integer j = 0; j < 784; j = j + 64)begin
-                //向4块MLB中写入2张图片数据（一张图片(784)占据2个MLB的容量(512)）
-                for(integer k = j; k < (j + 64); k = k + 1)begin  // 一个PE控制信号需要对应16个输入数据
-                    if(k < 784)begin  //到第13次循环的时候，会存在k大于784的情况，因为784/64=12.25,会存在第13次只给MLB0赋值的情况
-                        wire_mem_in[k] = test_images[img_index][k];
-                        wire_mem_in[1024+k] = test_images[img_index+1][k];
+            pe_array_num = 0;
+            col_index = 0;
+            for(integer j = 0; j < 2048; j = j + 64)begin
+                for(integer k = j % 512; k < (j + 16); k = k + 1)begin  // 一个PE控制信号需要对应16个输入数据
+                    if(k < 272)begin  //784-512=272， 一直图片大小为784，需要PE array 512加载2次，因此第二次
+                        wire_mem_in[512+k] = test_images[img_index][512+k];
+                        wire_mem_in[1536+k] = test_images[img_index][512+k];  //这里不加1是为了实现一张图片保存到4个MLB中，然后对应的和2张参考图片进行计算
                     end
+                    if(k < 512)begin  //到第13次循环的时候，会存在k大于784的情况，因为784/64=12.25,会存在第13次只给MLB0赋值的情况
+                        wire_mem_in[k] = test_images[img_index][k];
+                        wire_mem_in[1024+k] = test_images[img_index][k];     //这里不加1是为了实现一张图片保存到4个MLB中，然后对应的和2张参考图片进行计算
+                    end
+                    
                 end
-                #2
-                if(sel_pe[0] >= 5'b00111)begin
-                    sel_pe[0] = 5'b00000;
-                end else begin
-                    sel_pe[0] = sel_pe[0] + 1;
-                end
-                if(sel_pe[1] >= 5'b01111)begin
-                    sel_pe[1] = 5'b01000;
-                end else begin
-                    sel_pe[1] = sel_pe[1] + 1;
-                end
-                if(sel_pe[2] >= 5'b10111)begin
-                    sel_pe[2] = 5'b10000;
-                end else begin
-                    sel_pe[2] = sel_pe[2] + 1;
-                end
-                if(sel_pe[3] >= 5'b11111)begin
-                    sel_pe[3] = 5'b11000;
-                end else begin
-                    sel_pe[3] = sel_pe[3] + 1;
-                end
+                col_index = (col_index + 1) % 8;
+                pe_array_num = j / 512;
+                #2;
             end
             // 参考用例数量 60000
             for(ref_index = 0; ref_index < 60; ref_index = ref_index + 2)begin  //一个循环读取2张图片
                 //把2张参考用例图片数据写入到MLB，从内存读取数据到MLB
                 write_en = 1;
                 read_en = 0;
-                sel_pe[0] = 5'b00000;
-                sel_pe[1] = 5'b01000;
-                sel_pe[2] = 5'b10000;
-                sel_pe[3] = 5'b11000;
-                for(integer x = 0; x < 784; x = x + 64)begin
-                    for(integer y = x; y < (x + 64); y = y + 1)begin  // 一个PE控制信号需要对应16个输入数据
-                        if(y < 784)begin  //到第13次循环的时候，会存在k大于784的情况，因为784/64=12.25,会存在第13次只给MLB0赋值的情况
+                pe_array_num = 0;
+                col_index = 0;
+                for(integer x = 0; x < 2048; x = x + 64)begin
+                    for(integer y = x % 512; y < (x + 16); y = y + 1)begin  // 一个PE控制信号需要对应16个输入数据
+                        if(y < 272)begin  //784-512=272， 一直图片大小为784，需要PE array 512加载2次，因此第二次
+                            wire_mem_par[512+y] = ref_images[ref_index][512+y];
+                            wire_mem_par[1536+y] = ref_images[ref_index+1][512+y];
+                        end
+                        if(y < 512)begin  //到第13次循环的时候，会存在y大于784的情况，因为784/64=12.25,会存在第13次只给MLB0赋值的情况
                             wire_mem_par[y] = ref_images[ref_index][y];
                             wire_mem_par[1024+y] = ref_images[ref_index+1][y];
                         end
-                    end
-                    #2
-                    if(sel_pe[0] >= 5'b00111)begin
-                        sel_pe[0] = 5'b00000;
-                    end else begin
-                        sel_pe[0] = sel_pe[0] + 1;
-                    end
-                    if(sel_pe[1] >= 5'b01111)begin
-                        sel_pe[1] = 5'b01000;
-                    end else begin
-                        sel_pe[1] = sel_pe[1] + 1;
-                    end
-                    if(sel_pe[2] >= 5'b10111)begin
-                        sel_pe[2] = 5'b10000;
-                    end else begin
-                        sel_pe[2] = sel_pe[2] + 1;
-                    end
-                    if(sel_pe[3] >= 5'b11111)begin
-                        sel_pe[3] = 5'b11000;
-                    end else begin
-                        sel_pe[3] = sel_pe[3] + 1;
-                    end
+                            
+                    end 
+                    col_index = (col_index + 1) % 8;
+                    pe_array_num = x / 512;
+                    #2;
                 end
-                write_en = 0;
-                read_en = 1;
-                //从MLB中读取8次数据进行计算(cal_distance)
-                sum_row_pe = 2'b10;    //row select sum of row PE  
-                sum_column_pe = 2'b10;  //column select sum of column PE
-                is_save_cu_out = 4'b0000;
-                clear_reg = 1'b0;  //reset last time running value 1
-                for (integer z = 0; z < 8; z = z + 1)begin
-                    col_index = z[2:0];
-                    sel_pe[0] = col_index;
-                    sel_pe[1] = col_index + 8;
-                    sel_pe[2] = col_index + 16;
-                    sel_pe[3] = col_index + 24;
-                    //控制信号清零，这样再次赋值才会生效
-                    sel_cu = 8'b00000000;   //subtraction
-                    #2
-                    is_save_cu_out = 4'b1111;
-                    sel_cu_go_back = 8'b01010101;  // cu result go to par
-                    sel_adder = 8'b00000000;
-                    #2
-                    sel_cu_go_back = 8'b11111111;  // cu result go to in
-                    #2
+                //------------------------------------------向MLB写数据finish-------------------------------------------
+                //------------------------------------------从MLB读数据start--------------------------------------------
+                // 开始对写满的4块MLB进行读数据，然后计算，这里执行4次
+                for(integer w = 0; w < 4; w = w + 1)begin
+                    write_en = 0;
+                    read_en = 1;
+                    //从MLB中读取8次数据进行计算(cal_distance)
+                    sum_row_pe = 2'b10;    //row select sum of row PE  
+                    sum_column_pe = 2'b10;  //column select sum of column PE
                     is_save_cu_out = 4'b0000;
-                    sel_cu = 8'b11111111;   //multiplication
-                    sel_cu_go_back = 8'b10101010;  //go next
-                    #2
-                    //当is_save_cu_out置为0时，不能马上将sel_adder放开，否则会导致要赋值给in和par的cu_out先给cu_computer_out再给adder_in最终将值输出从而造成结果出错
-                    sel_adder = 8'b10101010;     
+                    clear_reg = 1'b0;  //reset last time running value 1
+                    acc_sig = 3'b1;
+                    acc_is_stop = 0;
+                    clear_reg_acc = 0;
+                    pe_array_num = w;
+                    for (integer z = 0; z < 8; z = z + 1)begin
+                        col_index = z[2:0];
+                        //控制信号清零，这样再次赋值才会生效
+                        sel_cu = 8'b00000000;   //subtraction
+                        #2
+                        is_save_cu_out = 4'b1111;
+                        sel_cu_go_back = 8'b01010101;  // cu result go to par
+                        sel_adder = 8'b00000000;
+                        #2
+                        sel_cu_go_back = 8'b11111111;  // cu result go to in
+                        #2
+                        is_save_cu_out = 4'b0000;
+                        sel_cu = 8'b11111111;   //multiplication
+                        sel_cu_go_back = 8'b10101010;  //go next
+                        #2
+                        //当is_save_cu_out置为0时，不能马上将sel_adder放开，否则会导致要赋值给in和par的cu_out先给cu_computer_out再给adder_in最终将值输出从而造成结果出错
+                        sel_adder = 8'b10101010;     
+                    end
+                    #2  //这里需要等一下PE array的结果出来之后再输出
+                    //计算完两个PE array的结果之后，将其累加，才是两张图片之间距离计算的输出
+                    if(w == 1 || w == 3)begin
+                        acc_is_stop = 1;  //输出结果，然后等2个时间单位，再清除累加和
+                        #2
+                        acc_is_stop = 0;  
+                        //PE array 8列数据计算完成，清除内部累加寄存器，否则第二次循环的话，会把上一次的值累加
+                        clear_reg_acc = 1'b1;
+                        #2
+                        clear_reg_acc = 1'b0;
+                        if(w == 1) begin
+                            sort_ref_index = ref_index;
+                        end else begin
+                            sort_ref_index = ref_index + 1;
+                        end
+                    end 
+                    
+                    #2;
                 end
-                //PE array 8列数据计算完成，清除内部累加寄存器，否则第二次循环的话，会把上一次的值累加
-                clear_reg = 1'b1;
+                //------------------------------------------从MLB读数据finish--------------------------------------------
             end
         end
         #100
