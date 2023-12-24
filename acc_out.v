@@ -10,6 +10,7 @@ module acc_out(
 );
 reg[31:0]   acc_data;
 reg         need_add;   
+reg[31:0]   out;
 
 always @ (data) begin : set_new_data
     need_add = 1;
@@ -21,12 +22,18 @@ always @(posedge clk or negedge rst) begin : clear_acc_reg   //将当前所有�
     end else begin
         if(clear_reg)begin
             acc_data = 32'h0;
-        end
+        end // 
         
     end
 end
 
-assign out = isStop ? acc_data : 32'hxxxx_xxxx;
+always @(posedge clk or negedge rst)begin : output_result
+    if(!rst)begin
+
+    end else begin
+        out = isStop ? acc_data : 32'hxxxx_xxxx;
+    end
+end
 
 always @ (posedge clk or negedge rst)begin
     if(!rst)begin

@@ -41,6 +41,7 @@ reg[31:0] row_pe_array2[15:0];
 reg[31:0] row_pe_array3[15:0]; 
 // result of column PE for scalar
 reg[31:0] row_pe_scalar[3:0];
+reg[31:0] col_pe_scalar[7:0];
 // 一列PE的标量输出
 wire[31:0] pe_scalar_output[31:0];
 reg[31:0] pre_pe_scalar_output[31:0];
@@ -96,6 +97,7 @@ initial begin:initial_var
         pre_pe_scalar_output[i] = 32'h0;
     end
     for(i = 0; i < 8; i = i + 1)begin
+        col_pe_scalar[i] = 32'h0;
         for(j = 0; j < 64; j = j + 1)begin
             pre_pe_array_output[i][j] = 32'h0;
         end
@@ -130,13 +132,17 @@ always @ (posedge clk or negedge rst)begin:clear_reg
                 pre_pe_scalar_output[i] = 32'h0;
             end
             for(i = 0; i < 8; i = i + 1)begin
+                col_pe_scalar[i] = 32'h0;
                 for(j = 0; j < 64; j = j + 1)begin
                     pre_pe_array_output[i][j] = 32'h0;
+                    all_in[i][j] = 32'h0;
+                    all_par[i][j] = 32'h0;
                 end
             end
         end
     end
 end
+
 
 always@(*) begin:handle_input
     integer i;
@@ -355,7 +361,7 @@ generate
     genvar i;
     for (i = 0; i < 8; i = i + 1) begin : gen_all_PE
         // instance col 1 row 1
-        PE pe_inst1 (
+        PE pe_inst0 (
             .clk(clk),
             .rst(rst),
             .In0(all_in[i][0]), .In1(all_in[i][1]), .In2(all_in[i][2]), .In3(all_in[i][3]),.In4(all_in[i][4]), .In5(all_in[i][5]), .In6(all_in[i][6]), .In7(all_in[i][7]), .In8(all_in[i][8]), .In9(all_in[i][9]), .In10(all_in[i][10]), .In11(all_in[i][11]), .In12(all_in[i][12]), .In13(all_in[i][13]), .In14(all_in[i][14]), .In15(all_in[i][15]),
@@ -370,7 +376,7 @@ generate
         );
 
         // instance col 1 row 2
-        PE pe_inst2 (
+        PE pe_inst1 (
             .clk(clk),
             .rst(rst),
             .In0(all_in[i][16]), .In1(all_in[i][17]), .In2(all_in[i][18]), .In3(all_in[i][19]),.In4(all_in[i][20]), .In5(all_in[i][21]), .In6(all_in[i][22]), .In7(all_in[i][23]),.In8(all_in[i][24]), .In9(all_in[i][25]), .In10(all_in[i][26]), .In11(all_in[i][27]),.In12(all_in[i][28]), .In13(all_in[i][29]), .In14(all_in[i][30]), .In15(all_in[i][31]),
@@ -385,7 +391,7 @@ generate
         );
 
         // instance col 1 row 3
-        PE pe_inst3 (
+        PE pe_inst2 (
             .clk(clk),
             .rst(rst),
             .In0(all_in[i][32]), .In1(all_in[i][33]), .In2(all_in[i][34]), .In3(all_in[i][35]),.In4(all_in[i][36]), .In5(all_in[i][37]), .In6(all_in[i][38]), .In7(all_in[i][39]),.In8(all_in[i][40]), .In9(all_in[i][41]), .In10(all_in[i][42]), .In11(all_in[i][43]),.In12(all_in[i][44]), .In13(all_in[i][45]), .In14(all_in[i][46]), .In15(all_in[i][47]),
@@ -400,7 +406,7 @@ generate
         );
 
         // instance col 1 row 4
-        PE pe_inst4 (
+        PE pe_inst3 (
             .clk(clk),
             .rst(rst),
             .In0(all_in[i][48]), .In1(all_in[i][49]), .In2(all_in[i][50]), .In3(all_in[i][51]),.In4(all_in[i][52]), .In5(all_in[i][53]), .In6(all_in[i][54]), .In7(all_in[i][55]),.In8(all_in[i][56]), .In9(all_in[i][57]), .In10(all_in[i][58]), .In11(all_in[i][59]),.In12(all_in[i][60]), .In13(all_in[i][61]), .In14(all_in[i][62]), .In15(all_in[i][63]),
@@ -441,10 +447,10 @@ always @(posedge clk or negedge rst) begin : pe_output_handler
 
         if(is_value_changed == 2'b00)begin
             for(j = 0 ; j < 64; j = j + 1)begin
-                if(pre_pe_array_output[Col_index][i] !== pe_array_output[Col_index][i])begin
+                if(pre_pe_array_output[Col_index][j] !== pe_array_output[Col_index][j])begin
                     is_value_changed = 2'b01;
                     pre_pe_array_output[Col_index][j] = pe_array_output[Col_index][j];
-                    value_changed_index = i;
+                    // value_changed_index = j;
                 end
             end   
         end
@@ -495,6 +501,10 @@ always @(posedge clk or negedge rst) begin : pe_output_handler
                         row_pe_scalar[1] = (pe_scalar_output[8+Col_index] !== 32'hxxxx_xxxx)? row_pe_scalar[1] + pe_scalar_output[8+Col_index] : row_pe_scalar[1];
                         row_pe_scalar[2] = (pe_scalar_output[16+Col_index] !== 32'hxxxx_xxxx)? row_pe_scalar[2] + pe_scalar_output[16+Col_index] : row_pe_scalar[2];
                         row_pe_scalar[3] = (pe_scalar_output[24+Col_index] !== 32'hxxxx_xxxx)? row_pe_scalar[3] + pe_scalar_output[24+Col_index] : row_pe_scalar[3];
+                        col_pe_scalar[Col_index] = (pe_scalar_output[Col_index] !== 32'hxxxx_xxxx)? col_pe_scalar[Col_index] + pe_scalar_output[Col_index] : col_pe_scalar[Col_index];
+                        col_pe_scalar[Col_index] = (pe_scalar_output[8+Col_index] !== 32'hxxxx_xxxx)? col_pe_scalar[Col_index] + pe_scalar_output[Col_index+8] : col_pe_scalar[Col_index];
+                        col_pe_scalar[Col_index] = (pe_scalar_output[16+Col_index] !== 32'hxxxx_xxxx)? col_pe_scalar[Col_index] + pe_scalar_output[Col_index+16] : col_pe_scalar[Col_index];
+                        col_pe_scalar[Col_index] = (pe_scalar_output[24+Col_index] !== 32'hxxxx_xxxx)? col_pe_scalar[Col_index] + pe_scalar_output[Col_index+24] : col_pe_scalar[Col_index];
                     end else if(is_value_changed == 2'b01)begin
                         for (i = 0; i < 16; i = i + 1) begin
                             row_pe_array0[i] = row_pe_array0[i] + pe_array_output[Col_index][i];

@@ -68,6 +68,8 @@ module PE_tb;
         par13 = 32'h0e;
         par14 = 32'h0f;
         par15 = 32'h10;
+    
+        is_save_cu_out<=1'b0;   //要给这个赋0，cu_out才能输出
     #20    
         sel_cu<=2'b11;  //执行乘法操作
     #20 
@@ -123,7 +125,7 @@ module PE_tb;
         sel_adder<=2'b01; //跳过加法树进入下一步
     #20
         //控制信号归零，方便后面调试查看
-        sel_cu<=2'b00; sel_cu_go_back<=2'b00; sel_adder<=2'b00;
+        sel_cu<=2'b00; sel_cu_go_back<=2'b00; sel_adder<=2'b00; is_save_cu_out<=1'b0;
 
     #100
         //----------------------测试求两个点的距离的情况，先加后乘   距离计算：k-NN， k-Means------------------------------------
@@ -167,7 +169,7 @@ module PE_tb;
         par14 = 32'h0f;
         par15 = 32'h10;
     #20    
-        sel_cu<=2'b10;  //计算加法操作
+        sel_cu<=2'b00;  //计算减法操作
     #20 
         //这里由于把cu_out赋值给Par以后，就会算出一个新的cu_out，因此需要先保存一下，再复制
         is_save_cu_out<=1'b1;
@@ -175,6 +177,8 @@ module PE_tb;
         sel_cu_go_back<=2'b01;  //把结果赋值给Par
     #20 
         sel_cu_go_back<=2'b11;  //把结果赋值给In
+    #20
+        is_save_cu_out<=1'b0;
     #20    
         sel_cu<=2'b11;         //计算乘法操作
     #20 

@@ -55,10 +55,11 @@ generate
   for (j = 0; j < 16; j = j + 1) begin
     computer_unit cu_inst (
       .clk(clk),
-      .enable(!Is_save_cu_out),
+      .rst(rst),
       .Input_data(In_data[j]),
       .Input_par(Par_data[j]),
       .Sel(Sel_cu),
+      .Is_ouput(!Is_save_cu_out),
       .Out(cu_out[j])
     );
   end
@@ -126,7 +127,7 @@ always @(posedge clk or negedge rst)begin : reset_par_or_in
                     begin
                         //Par_data数据来自已经计算完成的CU结果
                         for (i = 0; i < 16; i = i + 1) begin
-                            if(save_cu_out[i] != 32'hxxxx_xxxx)begin
+                            if(save_cu_out[i] !== 32'hxxxx_xxxx)begin
                                 Par_data[i] = save_cu_out[i];
                             end
                             
@@ -137,7 +138,7 @@ always @(posedge clk or negedge rst)begin : reset_par_or_in
                     begin
                         //In_data数据来自已经计算完成的CU结果
                         for (i = 0; i < 16; i = i + 1) begin
-                            if(save_cu_out[i] != 32'hxxxx_xxxx)begin
+                            if(save_cu_out[i] !== 32'hxxxx_xxxx)begin
                                 In_data[i] = save_cu_out[i];
                             end
                         end
