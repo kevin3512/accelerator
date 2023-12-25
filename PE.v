@@ -7,7 +7,8 @@ module PE(
     input[1:0]      Sel_cu,   //CU内部的控制信号
     input[1:0]      Sel_cu_go_back,  //CU 输出后是否回流的控制信号
     input[1:0]      Sel_adder,  //是否进入加法树的控制信号
-    input           Is_save_cu_out,   //是否保存cu_out，如果想要把cu_out的值赋给In和Par，就需要用到它
+    input           Is_save_cu_out,   //这个信号高电平时有两个功能，1，保存cu_out的输出到寄存器save_cu_out寄存器 ， 2，禁止cu计算结果保存到cu_out（因为会影响功能1，并且还有其他影响）
+    input           Clear_reg,       //清除寄存器
     output[31:0]    Out_total,       //输出和
     output[31:0]    Out0, Out1, Out2, Out3, Out4, Out5, Out6, Out7, Out8, Out9, Out10, Out11, Out12, Out13, Out14, Out15  //对应每个CU计算的结果输出
     
@@ -48,6 +49,22 @@ assign Out13 = Out_data[13];
 assign Out14 = Out_data[14];
 assign Out15 = Out_data[15];
 
+always @ (posedge clk or negedge rst)begin: clear_pe_reg
+    if(!rst)begin
+
+    end else begin
+        if(Clear_reg)begin
+            for(integer i = 0 ; i < 16; i = i + 1)begin
+                In_data[i] = 32'h0;
+                Par_data[i] = 32'h0;
+                save_cu_out[i] = 32'h0;
+                cu_complet_out[i] = 32'h0;
+                adder_in[i] = 32'h0;
+            end
+        end
+    end
+end
+
 //-------------开始描述PE电路结构-----------------------
 //描述CU电路结构
 generate
@@ -59,7 +76,7 @@ generate
       .Input_data(In_data[j]),
       .Input_par(Par_data[j]),
       .Sel(Sel_cu),
-      .Is_ouput(!Is_save_cu_out),
+      .Is_output(!Is_save_cu_out),
       .Out(cu_out[j])
     );
   end

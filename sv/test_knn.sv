@@ -496,6 +496,7 @@ module test_knn;
                         unit_tile_idx_par = z[2:0];
                         //控制信号清零，这样再次赋值才会生效
                         sel_cu = 8'b00000000;   //subtraction
+                        sel_cu_go_back = 8'b00000000;  //需要把置为0，否则上一次的结果会顺延到下一个周期
                         #4
                         is_save_cu_out = 4'b1111;
                         sel_cu_go_back = 8'b01010101;  // cu result go to par
@@ -533,6 +534,7 @@ module test_knn;
                 end
                 //----------------- -------------------------从MLB读数据finish--------------------------------------------
             end
+            #100;  //这里是为了给最后一个数据时间去处理
         end
         #100
         $finish; // 完成仿真
