@@ -4,7 +4,14 @@ comp  : clean vcs
 vcs   :
 	vcs  \
 		-f filelist.f  \
-		-timescale=1ns/1ps \
+		-timescale=1ns/1ns \
+		-full64  -R  +vc  +v2k  -sverilog -debug_access+all\
+		|  tee  vcs.log 
+#vcs2 use to compile PuDianNao relate code-------------------------
+vcs2   :
+	vcs  \
+		-f filelist2.f  \
+		-timescale=1ns/1ns \
 		-full64  -R  +vc  +v2k  -sverilog -debug_access+all\
 		|  tee  vcs.log 
 #-------------------------------------------------------------------------------------------------------

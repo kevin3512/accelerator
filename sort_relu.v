@@ -8,7 +8,7 @@ module sort_relu(
     input           is_start,     //是否可以开始
     input           clear_reg
 );
-parameter K = 8;
+parameter K = 20;
 reg[31:0] value_index[K-1:0];   //保存的当前最大/小值的下标
 reg[31:0] value[K-1:0];         //保存的当前K个最大/小值
 reg [31:0] temp1_value; 
