@@ -1,6 +1,6 @@
 module Acc #(parameter WIDTH = 32)(
     input[WIDTH-1:0]    in,
-    input               isStop,  //是否结束累加
+    input               is_output,  //是否结束累加
     input               clear_reg,  //清除累加数据
     output[WIDTH-1:0]   out
 );
@@ -23,6 +23,6 @@ always @(need_add or clear_reg) begin : clear_acc_reg   //将当前所有保存�
     end 
 end
 
-assign out = isStop ? acc_data : 32'hxxxx_xxxx;
+assign out = is_output ? acc_data : 32'hxxxx_xxxx;
 
 endmodule

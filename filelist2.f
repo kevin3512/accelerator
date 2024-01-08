@@ -11,6 +11,10 @@
 ./PuDianNao/k_sort.sv
 ./PuDianNao/nonlinear.sv
 ./PuDianNao/MLU.sv
+./PuDianNao/HotBuffer.sv
+./PuDianNao/ColdBuffer.sv
+./PuDianNao/OutputBuffer.sv
+./PuDianNao/test_knn.sv
 
 
 

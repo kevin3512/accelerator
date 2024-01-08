@@ -1,8 +1,8 @@
-module Multiplier#(parameter WIDTH = 16)(
+module Multiplier#(parameter WIDTH = 32)(
     input[WIDTH-1:0]        hot_in[15:0],        
     input[WIDTH-1:0]        cold_in[15:0],
     input[WIDTH-1:0]        pre_data[15:0],    //从Adder层过来的数据
-    input                   sel_in,         //选择直接从hotBuff或者coldBuff过来的，还是上一层过来的数据
+    input                   sel_in,         //选择直接从hotBuff或者coldBuff过来的(选1)，还是上一层过来的数据(选0)
     output[WIDTH-1:0]       out[15:0]
 );
 

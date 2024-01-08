@@ -435,7 +435,7 @@ module test_knn;
                 #2;
             end
             // 参考用例数量 60000
-            for(ref_index = 0; ref_index < 60; ref_index = ref_index + 2)begin  //一个循环读取2张图片
+            for(ref_index = 0; ref_index < 60; ref_index = ref_index + 2)begiln  //一个循环读取2张图片
                 //把2张参考用例图片数据写入到MLB，从内存读取数据到MLB
                 write_en = 1;
                 read_en = 0;

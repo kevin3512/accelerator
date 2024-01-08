@@ -1,5 +1,5 @@
 //8输入的加法器树
-module Adder_tree #(parameter WIDTH = 16)(
+module Adder_tree #(parameter WIDTH = 32)(
     input[WIDTH-1:0]        in[15:0],
     output[WIDTH-1:0]       out
 );

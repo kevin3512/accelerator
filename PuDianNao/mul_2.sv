@@ -1,4 +1,4 @@
-module mul_2#(parameter WIDTH = 16)(
+module mul_2#(parameter WIDTH = 32)(
     input[WIDTH-1:0]       in1,
     input[WIDTH-1:0]       in2,
     output[WIDTH-1:0]      out

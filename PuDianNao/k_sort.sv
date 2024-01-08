@@ -3,7 +3,6 @@ module k_sort#(parameter WIDTH = 32, K = 20)(
     input[WIDTH-1:0]     in,
     input[WIDTH-1:0]     index,
     input                asce,   //升序排序信号，1表示升序（从小到大排列），0表示降序
-    input                is_start,     //是否可以开始
     input                clear_reg,
     output               out[K-1:0]   //输出最小/大的k个结果
 );
@@ -28,24 +27,22 @@ always @(in)begin:compare
     reg   flag; //标志位，0表示没找到位置，继续遍历找，1表示找到遍历位置，开始数据后移
     flag = 0;
     
-    if(is_start)begin
-        for(i = 0; i < K; i = i + 1)begin
-            if(flag == 0)begin
-                if(value[i] === 32'hxxxx_xxxx || (asce && in < value[i])  || (!asce && in > value[i]))begin
-                    temp1_value = value[i];
-                    value[i] = in;
-                    temp1_index = value_index[i];
-                    value_index[i] = index;
-                    flag = 1;
-                end
-            end else begin
-                temp2_value = value[i];
-                value[i] = temp1_value;
-                temp1_value = temp2_value;
-                temp2_index = value_index[i];
-                value_index[i] = temp1_index;
-                temp1_index = temp2_index;
+    for(i = 0; i < K; i = i + 1)begin
+        if(flag == 0)begin
+            if(value[i] === 32'hxxxx_xxxx || (asce && in < value[i])  || (!asce && in > value[i]))begin
+                temp1_value = value[i];
+                value[i] = in;
+                temp1_index = value_index[i];
+                value_index[i] = index;
+                flag = 1;
             end
+        end else begin
+            temp2_value = value[i];
+            value[i] = temp1_value;
+            temp1_value = temp2_value;
+            temp2_index = value_index[i];
+            value_index[i] = temp1_index;
+            temp1_index = temp2_index;
         end
     end
     
