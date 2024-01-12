@@ -11,6 +11,7 @@
 ./PuDianNao/k_sort.sv
 ./PuDianNao/nonlinear.sv
 ./PuDianNao/MLU.sv
+./PuDianNao/ALU.sv
 ./PuDianNao/HotBuffer.sv
 ./PuDianNao/ColdBuffer.sv
 ./PuDianNao/OutputBuffer.sv

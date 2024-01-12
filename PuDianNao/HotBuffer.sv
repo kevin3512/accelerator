@@ -1,15 +1,15 @@
 module HotBuffer (
     input               clk,
     input               rst,
-    input[31:0]         in[255:0],
-    input[5:0]          idx,        // 8 KB = 64 * 256 * 16bit ，因此下标有6位
+    input[31:0]         in[15:0],
+    input[7:0]          idx,        // 8 KB = 256 * 16 * 16bit ，因此可以存储256次输入，下标有8位
     input               read_en,    //读使能
     input               write_en,   //写使能
-    output[31:0]        out[255:0]
+    output[31:0]        out[15:0]
 );
 
-reg[31:0]       buff[63:0][255:0];   //Hotbuff可以保存1024个MLU的输入，一轮16个MLU，可以提供32轮计算
-reg[31:0]       out[255:0];
+reg[31:0]       buff[255:0][15:0];   //Hotbuff可以保存256个MLU的输入，每个MLU的输入需要16维
+reg[31:0]       out[15:0];
 
 always @ (posedge clk or negedge rst)begin: save_mem_data
     integer i, j;
@@ -17,11 +17,11 @@ always @ (posedge clk or negedge rst)begin: save_mem_data
 
     end else begin
         if(write_en)begin
-            for(i = 0; i < 256; i = i + 1)begin
+            for(i = 0; i < 16; i = i + 1)begin
                 buff[idx][i] = in[i];
             end
         end else if(read_en) begin
-            for(j = 0; j < 256; j = j + 1)begin
+            for(j = 0; j < 16; j = j + 1)begin
                 out[j] = buff[idx][j];
             end
         end

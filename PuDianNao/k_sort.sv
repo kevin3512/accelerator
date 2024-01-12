@@ -4,7 +4,8 @@ module k_sort#(parameter WIDTH = 32, K = 20)(
     input[WIDTH-1:0]     index,
     input                asce,   //升序排序信号，1表示升序（从小到大排列），0表示降序
     input                clear_reg,
-    output               out[K-1:0]   //输出最小/大的k个结果
+    output[31:0]         out[K-1:0],   //输出最小/大的k个结果
+    output[31:0]         out_index[K-1:0]   //对应的下标
 );
 reg[WIDTH-1:0] value_index[K-1:0];   //保存的当前最大/小值的下标
 reg[WIDTH-1:0] value[K-1:0];         //保存的当前K个最大/小值
@@ -12,6 +13,16 @@ reg [WIDTH-1:0] temp1_value;
 reg [WIDTH-1:0] temp2_value;
 reg [WIDTH-1:0] temp1_index; 
 reg [WIDTH-1:0] temp2_index;
+
+
+generate
+    genvar w;
+    for (w = 0; w < K; w = w + 1) begin
+        assign out[w] = value[w];
+        assign out_index[w] = value_index[w];
+    end
+endgenerate
+
 
 always @(clear_reg) begin : clear_sort_reg   //将当前所有保存的寄存器清除
     if(clear_reg)begin

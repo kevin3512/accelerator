@@ -2,13 +2,13 @@ module ColdBuffer (
     input               clk,
     input               rst,
     input[31:0]         in[255:0],  //read width = u * f * 16 bit  , 其中u = 16 ， f = 16 , u 表示MLU的数量，f表示每个MLU能够处理的dimension或者是feature
-    input[6:0]          idx,        // 16 KB = 128 * 256 * 16 bit，因此下标有7位
+    input[4:0]          idx,        // 16 KB = 32 * 256 * 16 bit，因此下标有5位
     input               read_en,    //读使能
     input               write_en,   //写使能
     output[31:0]        out[255:0]
 );
 
-reg[31:0]       buff[127:0][255:0];   //Colcdbuff可以保存128轮16个MLU的输入
+reg[31:0]       buff[31:0][255:0];   //Colcdbuff可以保存32轮16个MLU的输入
 reg[31:0]       out[255:0];
 
 always @ (posedge clk or negedge rst)begin: save_mem_data
