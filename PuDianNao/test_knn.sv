@@ -4,6 +4,8 @@ module test_knn;
     parameter                     TEST_IMAGE_NUM = 10000;
     parameter                     IMAGE_SIZE = 784;   //28*28
     parameter                     K = 20;
+    parameter                     TESE_N = 32;     //实际运行的测试用例数量
+    parameter                     REF_N = 30;      //实际运行的参考用例数量（训练集）
     reg[7:0]                      ref_images[REF_IMAGE_NUM-1:0][IMAGE_SIZE-1:0];
     reg[7:0]                      ref_labels[REF_IMAGE_NUM-1:0]; 
     reg[7:0]                      test_images[TEST_IMAGE_NUM-1:0][IMAGE_SIZE-1:0];
@@ -435,8 +437,8 @@ module test_knn;
         ref_index = 0;
         test_index = 0;
         //将所有的测试用例，每16张一批，分别和所有的参考图片进行计算距离，并排序
-        for(test_index = 0; test_index < 32; test_index = test_index + 16)begin
-            for (ref_index = 0; ref_index < 30; ref_index = ref_index + 2)begin  //参考图片60张，一次取2张，占用128个MLU的数据所需
+        for(test_index = 0; test_index < TESE_N; test_index = test_index + 16)begin
+            for (ref_index = 0; ref_index < REF_N; ref_index = ref_index + 2)begin  //参考图片60张，一次取2张，占用128个MLU的数据所需
                 $display("正在计算第%0d~%0d个参考图片对应的所有测试实例运算", ref_index, ref_index+2);
                 //---------------------------向HotBuffer和ColdBuffer写数据------------------------------------------------------
                 //--------------向HotBuffer写入2张参考图片的数据---------------------------------
