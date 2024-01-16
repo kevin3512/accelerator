@@ -35,7 +35,7 @@ Adder adder_ins(.hot_in(hot_in), .cold_in(cold_in), .symbol(symbol), .out(out_ad
 Multiplier multiplier_ins(.hot_in(hot_in), .cold_in(cold_in), .pre_data(out_adder), .sel_in(sel_in), .out(out_multiplier));
 Adder_tree adder_tree_ins(.in(out_multiplier), .out(out_adder_tree));
 Acc acc_ins(.in(out_adder_tree), .is_output(is_output), .clear_reg(clear_reg_acc), .out(out_acc));
-Misc misc_ins(.in(out_acc), .index(index), .fun_id(fun_id), .asce(asce), .clear_reg(clear_reg_sort), .out_nonli(out_misc_nonlin), .out_ksort(out_misc_ksort), .out_ksort_index(out_misc_ksort_index));
+Misc misc_ins(.clk(clk), .rst(rst), .in(out_acc), .index(index), .fun_id(fun_id), .asce(asce), .clear_reg(clear_reg_sort), .out_nonli(out_misc_nonlin), .out_ksort(out_misc_ksort), .out_ksort_index(out_misc_ksort_index));
 
 sel_6 sel6_ins(.clk(clk), .rst(rst), .in_counter(out_counter), .in_adder(out_adder), .in_multiplier(out_multiplier), .in_acc(out_acc), .in_nonlin(out_misc_nonlin), .in_ksort(out_misc_ksort), .in_ksort_index(out_misc_ksort_index), .sel(sel_output), .count(count), .out_scalar(out_scalar), .out_vector(out_vector));
 endmodule

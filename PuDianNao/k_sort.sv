@@ -1,5 +1,7 @@
 // 排序和激活模块
 module k_sort#(parameter WIDTH = 32, K = 20)(
+    input                clk,
+    input                rst,
     input[WIDTH-1:0]     in,
     input[WIDTH-1:0]     index,
     input                asce,   //升序排序信号，1表示升序（从小到大排列），0表示降序
@@ -7,12 +9,14 @@ module k_sort#(parameter WIDTH = 32, K = 20)(
     output[31:0]         out[K-1:0],   //输出最小/大的k个结果
     output[31:0]         out_index[K-1:0]   //对应的下标
 );
-reg[WIDTH-1:0] value_index[K-1:0];   //保存的当前最大/小值的下标
-reg[WIDTH-1:0] value[K-1:0];         //保存的当前K个最大/小值
-reg [WIDTH-1:0] temp1_value; 
-reg [WIDTH-1:0] temp2_value;
-reg [WIDTH-1:0] temp1_index; 
-reg [WIDTH-1:0] temp2_index;
+
+reg[WIDTH-1:0]      value_index[K-1:0];   //保存的当前最大/小值的下标
+reg[WIDTH-1:0]      value[K-1:0];         //保存的当前K个最大/小值
+reg                 need_insert;   
+
+always @ (in) begin : set_new_data   //来了新数据就需要插入
+    need_insert = 1;
+end
 
 
 generate
@@ -33,30 +37,33 @@ always @(clear_reg) begin : clear_sort_reg   //将当前所有保存的寄存器
     end
 end
 
-always @(in)begin:compare
+always @(posedge clk or negedge rst)begin:compare
     integer i;
+    integer j;
     reg   flag; //标志位，0表示没找到位置，继续遍历找，1表示找到遍历位置，开始数据后移
     flag = 0;
     
-    for(i = 0; i < K; i = i + 1)begin
-        if(flag == 0)begin
-            if(value[i] === 32'hxxxx_xxxx || (asce && in < value[i])  || (!asce && in > value[i]))begin
-                temp1_value = value[i];
-                value[i] = in;
-                temp1_index = value_index[i];
-                value_index[i] = index;
-                flag = 1;
+    if(!rst)begin
+        //复位信号
+    end else begin
+        if(need_insert)begin
+            for(i = 0; i < K; i = i + 1)begin
+                if(flag == 0)begin
+                    if(value[i] === 32'hxxxx_xxxx || (asce && in < value[i])  || (!asce && in > value[i]))begin
+                        for(j = K-1; j > i; j = j - 1)begin
+                            value[j] = value[j-1];
+                            value_index[j] = value_index[j-1];
+                        end
+                        value[i] = in;
+                        value_index[i] = index;
+                        break;
+                    end
+                end 
             end
-        end else begin
-            temp2_value = value[i];
-            value[i] = temp1_value;
-            temp1_value = temp2_value;
-            temp2_index = value_index[i];
-            value_index[i] = temp1_index;
-            temp1_index = temp2_index;
+            need_insert = 0;  //插入过了，下个时钟上升沿就不要再插入了
         end
+        
     end
-    
 end
 
 endmodule

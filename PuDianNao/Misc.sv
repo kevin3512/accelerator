@@ -1,4 +1,6 @@
 module Misc#(parameter WIDTH = 32, K = 20)(
+    input                   clk,
+    input                   rst,
     input[WIDTH-1:0]        in,
     input[WIDTH-1:0]        index,
     input[2:0]              fun_id,       //非线性函数id
@@ -9,6 +11,6 @@ module Misc#(parameter WIDTH = 32, K = 20)(
     output[WIDTH-1:0]       out_ksort_index[K-1:0]
 );
 
-    nonlinear #(WIDTH) non_inst(.in(in), .fun_id(fun_id), .out(out_nonli));
-    k_sort #(WIDTH, K) k_sort_inst(.in(in), .index(index), .asce(asce), .clear_reg(clear_reg), .out(out_ksort), .out_index(out_ksort_index));
+    nonlinear #(WIDTH) non_inst(.clk(clk), .rst(rst), .in(in), .fun_id(fun_id), .out(out_nonli));
+    k_sort #(WIDTH, K) k_sort_inst(.clk(clk), .rst(rst), .in(in), .index(index), .asce(asce), .clear_reg(clear_reg), .out(out_ksort), .out_index(out_ksort_index));
 endmodule 

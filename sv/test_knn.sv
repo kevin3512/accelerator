@@ -404,7 +404,7 @@ module test_knn;
         end
         //测试用例数量10000
         //------------------------------------------向MLB写数据start-------------------------------------------
-        for (img_index = 0; img_index < 10; img_index = img_index + 1)begin
+        for (img_index = 0; img_index < 64; img_index = img_index + 1)begin
             $display("正在计算第%d个图片的分类结果", img_index+1);
             acc_is_stop = 0;
             write_en = 1;
@@ -435,7 +435,7 @@ module test_knn;
                 #2;
             end
             // 参考用例数量 60000
-            for(ref_index = 0; ref_index < 60; ref_index = ref_index + 2)begiln  //一个循环读取2张图片
+            for(ref_index = 0; ref_index < 60; ref_index = ref_index + 2)begin  //一个循环读取2张图片
                 //把2张参考用例图片数据写入到MLB，从内存读取数据到MLB
                 write_en = 1;
                 read_en = 0;
