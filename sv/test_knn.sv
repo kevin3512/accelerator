@@ -5,8 +5,8 @@ module test_knn;
     parameter         TEST_IMAGE_NUM = 10000;
     parameter         IMAGE_SIZE = 784;   //28*28
     parameter         BUFFER_SIZE = 2048;  //4 块 512
-    parameter         TEST_N = 32;     //实际运行的测试用例数量
-    parameter         REF_N = 30;      //实际运行的参考用例数量（训练集）
+    parameter         TEST_N = 6144;     //实际运行的测试用例数量
+    parameter         REF_N = 1000;      //实际运行的参考用例数量（训练集）
     reg               clk;
     reg               rst;
     reg [31:0]        in[3:0][15:0];       
@@ -407,7 +407,7 @@ module test_knn;
         //测试用例数量10000
         //------------------------------------------向MLB写数据start-------------------------------------------
         for (img_index = 0; img_index < TEST_N; img_index = img_index + 1)begin
-            $display("正在计算第%d个图片的分类结果", img_index+1);
+            $display("正在计算第%0d个图片的分类结果", img_index+1);
             acc_is_stop = 0;
             write_en = 1;
             read_en = 0;

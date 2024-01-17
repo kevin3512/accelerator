@@ -12,7 +12,7 @@ module k_sort#(parameter WIDTH = 32, K = 20)(
 
 reg[WIDTH-1:0]      value_index[K-1:0];   //保存的当前最大/小值的下标
 reg[WIDTH-1:0]      value[K-1:0];         //保存的当前K个最大/小值
-reg                 need_insert;   
+reg                 need_insert;         //新输入的in是否需要插入
 
 always @ (in) begin : set_new_data   //来了新数据就需要插入
     need_insert = 1;
