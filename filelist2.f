@@ -15,7 +15,6 @@
 ./PuDianNao/HotBuffer.sv
 ./PuDianNao/ColdBuffer.sv
 ./PuDianNao/OutputBuffer.sv
-./PuDianNao/test_knn.sv
-
+./PuDianNao/test_dnn.sv
 
 

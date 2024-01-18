@@ -8,6 +8,7 @@ module MLU #(parameter K = 20)(
     input[1:0]                      symbol,      //2'b10 表示hot_in-cold_in
     //  Multiplier部分需要的输入
     input                           sel_in,
+    input[7:0]                      shift_right,
     // Acc部分需要的输入
     input                           is_output,
     input                           clear_reg_acc,      //清除Acc寄存器数据
@@ -32,7 +33,7 @@ wire[31:0]              out_misc_ksort_index[K-1:0];
 
 Counter counter_ins (.hot_in(hot_in), .cold_in(cold_in), .out(out_counter));
 Adder adder_ins(.hot_in(hot_in), .cold_in(cold_in), .symbol(symbol), .out(out_adder));
-Multiplier multiplier_ins(.hot_in(hot_in), .cold_in(cold_in), .pre_data(out_adder), .sel_in(sel_in), .out(out_multiplier));
+Multiplier multiplier_ins(.hot_in(hot_in), .cold_in(cold_in), .pre_data(out_adder), .shift_right(shift_right),.sel_in(sel_in), .out(out_multiplier));
 Adder_tree adder_tree_ins(.in(out_multiplier), .out(out_adder_tree));
 Acc acc_ins(.in(out_adder_tree), .is_output(is_output), .clear_reg(clear_reg_acc), .out(out_acc));
 Misc misc_ins(.clk(clk), .rst(rst), .in(out_acc), .index(index), .fun_id(fun_id), .asce(asce), .clear_reg(clear_reg_sort), .out_nonli(out_misc_nonlin), .out_ksort(out_misc_ksort), .out_ksort_index(out_misc_ksort_index));

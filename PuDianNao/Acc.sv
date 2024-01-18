@@ -5,7 +5,7 @@ module Acc #(parameter WIDTH = 32)(
     output[WIDTH-1:0]   out
 );
 
-reg[WIDTH-1:0]  acc_data;
+reg[WIDTH-1:0]  acc_data = 32'h0;  //需要先拉clear_reg信号给acc_data赋0才能累加
 reg             need_add;
 reg[31:0]       out;
 

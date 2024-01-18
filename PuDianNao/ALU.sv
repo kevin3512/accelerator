@@ -2,11 +2,12 @@ module ALU #(parameter K = 20)(
     input               clk,
     input               rst,
     input[1:0]          select,                  //2'b01表示选择mlu输入, 2'b10表示选择outputbuffer输入
+    input[31:0]         in,                      //单独一个数输入
     input[31:0]         in_mlu[15:0],            //来自alu的输入,包括数据和index
     input[31:0]         in_output[15:0],         //来自OutputBuffer的输入,包括数据和index
     input[31:0]         in_count,                   //输入第几波数据计数
     input[31:0]         out_count,                   //输出第几波数据计数
-    input[3:0]          run_case,                //开始进行各种case的逻辑运算, 4'b0001 表示输出MLU到OutputBuf ,  4'b0001 表示排序MLU和OutputBuf的结果然后输出到OutputBuf
+    input[3:0]          run_case,                //开始进行各种case的逻辑运算, 4'b0001 表示输出MLU到OutputBuf ,  4'b0010 表示排序MLU和OutputBuf的结果然后输出到OutputBuf , 4'b0011 表示将输入in进行存储，存够16个数后直接输出
     input               is_asce_sort,            //较小的输出
     output[31:0]        out[15:0]
 
@@ -21,6 +22,9 @@ reg[31:0]       new_sorted_index[K-1:0];
 reg [31:0]      debug_out_vector_collect[((2*K)/16+1)*16-1:0];
 reg[31:0]       debug_out_ksort[2*K-1:0];
 reg[31:0]       out[15:0];
+reg[31:0]       save_out[15:0];  //用与保存in的数据
+integer         save_count = 0;    //保存的数据in的数量
+reg             is_saved;      //in输入是否已经保存过
 
 //解析输入数据  count + out_vector -->  sort[19:0]  + sort_index[19:0]
 function void process_data(input reg[31:0] count, input reg [31:0] out_vector[15:0], output reg [31:0] out_vector_collect[((2*K)/16+1)*16-1:0], output reg [31:0] out_sort[K-1:0], output reg [31:0] out_sort_index[K-1:0]);
@@ -51,6 +55,12 @@ function void package_data(input reg[31:0] count, input reg [31:0] new_sorted_da
     out_vector = out_ksort[count*16 +: 16]; //表示选择从count*16开始的16位数据赋值给out_vector
 endfunction
 
+always @ (in) begin
+    if(in !== 32'hxxxx_xxxx)begin
+        is_saved = 0;
+    end
+end
+
 always @ (posedge clk or negedge rst) begin
     if(!rst)begin
 
@@ -66,6 +76,8 @@ always @ (posedge clk or negedge rst) begin
                 begin
                     new_sorted_data = new_data;
                     new_sorted_index = new_index;
+                    //包装排序后的新数组输出
+                    package_data(out_count, new_sorted_data, new_sorted_index, out);
                 end
 
             4'b0010:   //重新排序MLU和来自OutputBuf的结果，然后输出到OutputBuf
@@ -90,10 +102,23 @@ always @ (posedge clk or negedge rst) begin
                             j = j + 1;  // 更新数组sorted_data的索引
                         end
                     end
+                    //包装排序后的新数组输出
+                    package_data(out_count, new_sorted_data, new_sorted_index, out);
+                end
+            4'b0011:
+                begin
+                    if(!is_saved)begin
+                        save_out[save_count] = in;
+                        save_count = save_count + 1;
+                        is_saved = 1;
+                        if(save_count >= 16)begin  //直接输出
+                            out[15:0] = save_out[15:0];
+                            save_count = 0;
+                        end
+                    end
                 end
         endcase
-        //包装排序后的新数组输出
-        package_data(out_count, new_sorted_data, new_sorted_index, out);
+        
                 
     end
 end
