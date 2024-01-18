@@ -12,7 +12,7 @@ always @ (*) begin
     case(fun_id)
         3'b001:    //ReLu
             begin
-                out = in > 0 ? in : 0;
+                out = in[WIDTH-1] > 0 ? 0 : in;
             end
     endcase
 end

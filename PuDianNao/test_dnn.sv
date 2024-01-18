@@ -4,7 +4,7 @@ module test_dnn;
     parameter                     TEST_IMAGE_NUM = 10000;
     parameter                     IMAGE_SIZE = 784;   //28*28
     parameter                     K = 20;
-    parameter                     TESE_N = 1;     //实际运行的测试用例数量
+    parameter                     TESE_N = 10;     //实际运行的测试用例数量
     parameter                     REF_N = 1000;      //实际运行的参考用例数量（训练集）
     reg[7:0]                      ref_images[REF_IMAGE_NUM-1:0][IMAGE_SIZE-1:0];
     reg[7:0]                      ref_labels[REF_IMAGE_NUM-1:0]; 
@@ -619,7 +619,7 @@ module test_dnn;
                             for(integer k = 0, row_num = 0 ; k < 16; k = k + 1)begin  //每个MLU16维数据
                                 row_num = row_start+j*16+k;  //row_num表示二维数组的行数，最大为784
                                 if(row_num <= 784)begin
-                                    cold_buff_in[j*16+k] = layer1_weights[row_start+j*16+k][col_start+k];
+                                    cold_buff_in[j*16+k] = layer1_weights[row_start+i*16+k][col_start+j];
                                 end else begin
                                     cold_buff_in[j*16+k] = 0;
                                 end
@@ -641,14 +641,14 @@ module test_dnn;
                         #2;    //给时间记录数据
                         sel_in = 1;  //选择从HotBuf和ColdBuf直接传递过来的数据
                         shift_right = 8'b00010000;  //右移16位
-                        fun_id = 3'b0;  // 暂时用不上非线性函数
+                        fun_id = 3'b001;  // 使用ReLu作为非线性函数
                         asce = 1'b1;
 
                         if(hot_idx >= 49)begin   //多一个是image的全1行乘以biases值
                             // alu_run_case = 4'b0100;  //清除ALU之前的输出数据，避免造成干扰
                             // #4;
                             //输出到OutputBuf
-                            sel_output = 3'b100;   //sel_6选择Acc作为MLU输出
+                            sel_output = 3'b101;   //sel_6选择nonlinear作为MLU输出
                             is_output = 1;        //Acc输出到sel_6模块
                             #4;
                             is_output = 0;    //清空为0了，避免0输出
@@ -713,7 +713,7 @@ module test_dnn;
                             for(integer k = 0, row_num = 0 ; k < 16; k = k + 1)begin  //每个MLU16维数据
                                 row_num = row_start+j*16+k;  //row_num表示二维数组的行数，最大为1024
                                 if(row_num <= 1024)begin
-                                    cold_buff_in[j*16+k] = layer2_weights[row_start+j*16+k][col_start+k];
+                                    cold_buff_in[j*16+k] = layer2_weights[row_start+i*16+k][col_start+j];
                                 end else begin
                                     cold_buff_in[j*16+k] = 0;
                                 end
@@ -735,14 +735,14 @@ module test_dnn;
                         #2;    //给时间记录数据
                         sel_in = 1;  //选择从HotBuf和ColdBuf直接传递过来的数据
                         shift_right = 8'b00010000;  //右移16位
-                        fun_id = 3'b0;  // 暂时用不上非线性函数
+                        fun_id = 3'b001;  // 使用ReLu作为非线性函数
                         asce = 1'b1;
 
                         if(hot_idx >= 64)begin   //多一个是输入的全1行乘以biases值
                             // alu_run_case = 4'b0100;  //清除ALU之前的输出数据，避免造成干扰
                             // #4;
                             //输出到OutputBuf
-                            sel_output = 3'b100;   //sel_6选择Acc作为MLU输出
+                            sel_output = 3'b101;   //sel_6选择nonlinear作为MLU输出
                             is_output = 1;        //Acc输出到sel_6模块
                             #4;
                             is_output = 0;    //清空为0了，避免0输出
@@ -807,7 +807,7 @@ module test_dnn;
                             for(integer k = 0, row_num = 0 ; k < 16; k = k + 1)begin  //每个MLU16维数据
                                 row_num = row_start+j*16+k;  //row_num表示二维数组的行数，最大为512
                                 if(row_num <= 512)begin
-                                    cold_buff_in[j*16+k] = layer3_weights[row_start+j*16+k][col_start+k];
+                                    cold_buff_in[j*16+k] = layer3_weights[row_start+i*16+k][col_start+j];
                                 end else begin
                                     cold_buff_in[j*16+k] = 0;
                                 end
@@ -829,14 +829,14 @@ module test_dnn;
                         #2;    //给时间记录数据
                         sel_in = 1;  //选择从HotBuf和ColdBuf直接传递过来的数据
                         shift_right = 8'b00010000;  //右移16位
-                        fun_id = 3'b0;  // 暂时用不上非线性函数
+                        fun_id = 3'b001;  // 使用ReLu作为非线性函数
                         asce = 1'b1;
 
                         if(hot_idx >= 32)begin   //多一个是输入的全1行乘以biases值
                             // alu_run_case = 4'b0100;  //清除ALU之前的输出数据，避免造成干扰
                             // #4;
                             //输出到OutputBuf
-                            sel_output = 3'b100;   //sel_6选择Acc作为MLU输出
+                            sel_output = 3'b101;   //sel_6选择nonlinear作为MLU输出
                             is_output = 1;        //Acc输出到sel_6模块
                             #4;
                             is_output = 0;    //清空为0了，避免0输出
@@ -926,12 +926,12 @@ module test_dnn;
                         #2;    //给时间记录数据
                         sel_in = 1;  //选择从HotBuf和ColdBuf直接传递过来的数据
                         shift_right = 8'b00010000;  //右移16位
-                        fun_id = 3'b0;  // 暂时用不上非线性函数
+                        fun_id = 3'b001;  // 使用ReLu作为非线性函数
                         asce = 1'b1;
 
                         if(hot_idx >= 16)begin   //多一个是输入的全1行乘以biases值
                             //输出到OutputBuf
-                            sel_output = 3'b100;   //sel_6选择Acc作为MLU输出
+                            sel_output = 3'b101;   //sel_6选择nonlinear作为MLU输出
                             is_output = 1;        //Acc输出到sel_6模块
                             #4;
                             is_output = 0;    //清空为0了，避免0输出
