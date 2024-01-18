@@ -4,24 +4,29 @@ module test_dnn;
     parameter                     TEST_IMAGE_NUM = 10000;
     parameter                     IMAGE_SIZE = 784;   //28*28
     parameter                     K = 20;
-    parameter                     TESE_N = 2;     //实际运行的测试用例数量
+    parameter                     TESE_N = 1;     //实际运行的测试用例数量
     parameter                     REF_N = 1000;      //实际运行的参考用例数量（训练集）
     reg[7:0]                      ref_images[REF_IMAGE_NUM-1:0][IMAGE_SIZE-1:0];
     reg[7:0]                      ref_labels[REF_IMAGE_NUM-1:0]; 
     reg[7:0]                      test_images[TEST_IMAGE_NUM-1:0][IMAGE_SIZE:0];
     reg[7:0]                      test_labels[TEST_IMAGE_NUM-1:0]; 
-    reg[31:0]                     layer2_weights[784:0][1023:0];
-    reg[31:0]                     layer2_weights_one_dim[802815:0];
-    reg[31:0]                     layer2_biases[1023:0];
-    reg[31:0]                     layer3_weights[1024:0][511:0];
-    reg[31:0]                     layer3_weights_one_dim[524287:0];
-    reg[31:0]                     layer3_biases[511:0];
-    reg[31:0]                     layer4_weights[512:0][255:0];
-    reg[31:0]                     layer4_weights_one_dim[131071:0];
-    reg[31:0]                     layer4_biases[255:0];
-    reg[31:0]                     layer5_weights[256:0][9:0];
-    reg[31:0]                     layer5_weights_one_dim[2559:0];
-    reg[31:0]                     layer5_biases[9:0];
+    reg[31:0]                     layer1_weights[784:0][1023:0];
+    reg[31:0]                     layer1_weights_one_dim[802815:0];
+    reg[31:0]                     layer1_biases[1023:0];
+    reg[31:0]                     layer2_weights[1024:0][511:0];
+    reg[31:0]                     layer2_weights_one_dim[524287:0];
+    reg[31:0]                     layer2_biases[511:0];
+    reg[31:0]                     layer3_weights[512:0][255:0];
+    reg[31:0]                     layer3_weights_one_dim[131071:0];
+    reg[31:0]                     layer3_biases[255:0];
+    reg[31:0]                     layer4_weights[256:0][9:0];
+    reg[31:0]                     layer4_weights_one_dim[2559:0];
+    reg[31:0]                     layer4_biases[9:0];
+
+    reg[7:0]                      layer1_input[784:0];  //784个图片的数据+1，用与和layer1_biases相乘计算
+    reg[31:0]                     layer2_input[1024:0];  //1024个layer1的输出+1，用于和layer2_biase相乘计算
+    reg[31:0]                     layer3_input[512:0];  //512个layer2的输出+1，用于和layer3_biases相乘计算
+    reg[31:0]                     layer4_input[256:0];  //256个layer3的输出+1,用与和layer4_biases相乘计算
 
     integer                       test_index;  //测试用例（测试集）下标
     integer                       ref_index;  //参考用例（训练集）下标
@@ -424,85 +429,133 @@ module test_dnn;
     task read_dataset_and_parameters;
         output test_images;
         output test_labels;
+        output layer1_weights;
+        output layer1_biases;
         output layer2_weights;
         output layer2_biases;
         output layer3_weights;
         output layer3_biases;
         output layer4_weights;
         output layer4_biases;
-        output layer5_weights;
-        output layer5_biases;
         reg[7:0]        test_images[TEST_IMAGE_NUM-1:0][IMAGE_SIZE:0];
         reg[7:0]        test_labels[TEST_IMAGE_NUM-1:0]; 
-        reg[31:0]       layer2_weights[784:0][1023:0];
-        reg[31:0]       layer2_weights_one_dim[802815:0];
-        reg[31:0]       layer2_biases[1023:0];
-        reg[31:0]       layer3_weights[1024:0][511:0];
-        reg[31:0]       layer3_weights_one_dim[524287:0];
-        reg[31:0]       layer3_biases[511:0];
-        reg[31:0]       layer4_weights[512:0][255:0];
-        reg[31:0]       layer4_weights_one_dim[131071:0];
-        reg[31:0]       layer4_biases[255:0];
-        reg[31:0]       layer5_weights[256:0][9:0];
-        reg[31:0]       layer5_weights_one_dim[2559:0];
-        reg[31:0]       layer5_biases[9:0];
+        reg[31:0]       layer1_weights[784:0][1023:0];
+        reg[31:0]       layer1_weights_one_dim[802815:0];
+        reg[31:0]       layer1_biases[1023:0];
+        reg[31:0]       layer2_weights[1024:0][511:0];
+        reg[31:0]       layer2_weights_one_dim[524287:0];
+        reg[31:0]       layer2_biases[511:0];
+        reg[31:0]       layer3_weights[512:0][255:0];
+        reg[31:0]       layer3_weights_one_dim[131071:0];
+        reg[31:0]       layer3_biases[255:0];
+        reg[31:0]       layer4_weights[256:0][9:0];
+        reg[31:0]       layer4_weights_one_dim[2559:0];
+        reg[31:0]       layer4_biases[9:0];
 
 
         begin
             $readmemh("mnist_dataset/test-images.hex", test_images);
             $readmemh("mnist_dataset/test-labels.hex", test_labels);
-            $readmemh("mnist_dataset/layer2_weights_784x1024.hex", layer2_weights_one_dim);
-            $readmemh("mnist_dataset/layer2_biases_1024.hex", layer2_biases);
+            $readmemh("mnist_dataset/layer1_weights_784x1024.hex", layer1_weights_one_dim);
+            $readmemh("mnist_dataset/layer1_biases_1024.hex", layer1_biases);
 
-            $readmemh("mnist_dataset/layer3_weights_1024x512.hex", layer3_weights_one_dim);
-            $readmemh("mnist_dataset/layer3_biases_512.hex", layer3_biases);
+            $readmemh("mnist_dataset/layer2_weights_1024x512.hex", layer2_weights_one_dim);
+            $readmemh("mnist_dataset/layer2_biases_512.hex", layer2_biases);
 
-            $readmemh("mnist_dataset/layer4_weights_512x256.hex", layer4_weights_one_dim);
-            $readmemh("mnist_dataset/layer4_biases_256.hex", layer4_biases);
+            $readmemh("mnist_dataset/layer3_weights_512x256.hex", layer3_weights_one_dim);
+            $readmemh("mnist_dataset/layer3_biases_256.hex", layer3_biases);
 
-            $readmemh("mnist_dataset/layer5_weights_256x10.hex", layer5_weights_one_dim);
-            $readmemh("mnist_dataset/layer5_biases_10.hex", layer5_biases);
+            $readmemh("mnist_dataset/layer4_weights_256x10.hex", layer4_weights_one_dim);
+            $readmemh("mnist_dataset/layer4_biases_10.hex", layer4_biases);
 
             // 将一维数组映射到二维数组
             for (integer i=0; i<784; i=i+1) begin
                 for (integer j=0; j<1024; j=j+1) begin
-                    layer2_weights[i][j] = layer2_weights_one_dim[i*1024+j];
+                    layer1_weights[i][j] = layer1_weights_one_dim[i*1024+j];
                 end
             end
 
             for (integer i2=0; i2<1024; i2=i2+1) begin
                 for (integer j2=0; j2<512; j2=j2+1) begin
-                    layer3_weights[i2][j2] = layer3_weights_one_dim[i2*512+j2];
+                    layer2_weights[i2][j2] = layer2_weights_one_dim[i2*512+j2];
                 end
             end
 
             for (integer i=0; i<512; i=i+1) begin
                 for (integer j=0; j<256; j=j+1) begin
-                    layer4_weights[i][j] = layer4_weights_one_dim[i*256+j];
+                    layer3_weights[i][j] = layer3_weights_one_dim[i*256+j];
                 end
             end
 
             for (integer i=0; i<256; i=i+1) begin
                 for (integer j=0; j<10; j=j+1) begin
-                    layer5_weights[i][j] = layer5_weights_one_dim[i*10+j];
+                    layer4_weights[i][j] = layer4_weights_one_dim[i*10+j];
                 end
             end
         end
 
     endtask
 
-    task integrate_baises;
+    task load_layer1_inputs;
         // 添加一个1到所有images的最后一个位置 ， 用与和偏置值biase相乘
-        for(integer i = 0; i < TESE_N; i = i + 1)begin
-            test_images[i][784:0] = {test_images[i][783:0], 8'b1};
-        end
+        layer1_input[783:0] = test_images[test_index][783:0];
+        layer1_input[784] = 8'b1;
         // 将 biased 添加到 weights 的最后一行
-        layer2_weights[784] = layer2_biases;
+        layer1_weights[784][1023:0] = layer1_biases[1023:0];
+    endtask
+
+    //从OutputBuffer读取layer1_input数据
+    task load_layer2_inputs;
+        output_read_en = 1;
+        output_write_en = 0;
+        outbuf_idx = 0;
+        #4
+        layer2_input[255:0] = wire_outputbuf_out[255:0];
+        outbuf_idx = 1;
+        #4
+        layer2_input[511:256] = wire_outputbuf_out[255:0];
+        outbuf_idx = 2;
+        #4
+        layer2_input[767:512] = wire_outputbuf_out[255:0];
+        outbuf_idx = 3;
+        #4
+        layer2_input[1023:768] = wire_outputbuf_out[255:0];
+        layer2_input[1024] = 1;  //最后一个给1是为了和biases相乘计算
+        // 将 biased 添加到 weights 的最后一行
+        layer2_weights[1024] = layer2_biases;
+    endtask
+
+    //从OutputBuffer读取layer3_input数据
+    task load_layer3_inputs;
+        output_read_en = 1;
+        output_write_en = 0;
+        outbuf_idx = 0;
+        #4
+        layer3_input[255:0] = wire_outputbuf_out[255:0];
+        outbuf_idx = 1;
+        #4
+        layer3_input[511:256] = wire_outputbuf_out[255:0];
+        
+        layer3_input[512] = 1;  //最后一个给1是为了和biases相乘计算
+        // 将 biased 添加到 weights 的最后一行
+        layer3_weights[512] = layer3_biases;
+    endtask
+
+    //从OutputBuffer读取layer4_input数据
+    task load_layer4_inputs;
+        output_read_en = 1;
+        output_write_en = 0;
+        outbuf_idx = 0;
+        #4
+        layer4_input[255:0] = wire_outputbuf_out[255:0];
+        layer4_input[256] = 1;  //最后一个给1是为了和biases相乘计算
+        // 将 biased 添加到 weights 的最后一行
+        layer4_weights[256] = layer4_biases;
     endtask
 
 
     initial begin              
-        $fsdbDumpfile("tb3.fsdb");
+        $fsdbDumpfile("tb2.fsdb");
         $fsdbDumpvars(0);
         $fsdbDumpMDA();
         clk = 0;
@@ -516,10 +569,8 @@ module test_dnn;
     // 第二阶段，从Output Buffer中读出图片距离的16个部分和，然后进入MLU的排序模块，进行排序
     initial begin
         // 读取数据集和DNN模型参数到内存
-        read_dataset_and_parameters(test_images, test_labels, layer2_weights, layer2_biases, layer3_weights, layer3_biases, layer4_weights, layer4_biases, layer5_weights, layer5_biases);
-        $display("layer3_weight:%h , layer4_weight:%h, layer5_weight:%h" , layer3_weights[1023][511], layer4_weights[511][255], layer5_weights[255][9]);
-        //把偏置值集成到权重参数内
-        integrate_baises();
+        read_dataset_and_parameters(test_images, test_labels, layer1_weights, layer1_biases, layer2_weights, layer2_biases, layer3_weights, layer3_biases, layer4_weights, layer4_biases);
+        $display("layer2_weight:%h, layer2_weight:%h, layer3_weight:%h, layer4_weight:%h" , layer1_weights[783][1023], layer2_weights[1023][511], layer3_weights[511][255], layer4_weights[255][9]);
 
         for(integer kk1 = 0; kk1 < 10; kk1 = kk1 + 1)begin
             debug_test_image[kk1][783:0] = test_images[kk1][783:0];
@@ -528,102 +579,385 @@ module test_dnn;
         test_index = 0;
         outbuf_idx = 0;  //OutputBuf的idx累加，因为所有的参数都可以保存进来
         //将所有的测试用例，每16张一批，分别和所有的参考图片进行计算距离，并排序
-         for(test_index = 0; test_index < TESE_N; test_index = test_index + 2)begin
+         for(test_index = 0; test_index < TESE_N; test_index = test_index + 1)begin
             $display("正在计算第%0d~%0d张测试图片的分类结果", test_index, test_index+1);
-            //读取2张图片到Hotbuffer
+            
+            //加载L1层的输入和权重数据
+            load_layer1_inputs();
+
+            //-----------------计算L1层结果start------------------------------------------------
+            //读取Larer1_input数据到Hotbuffer
             hot_read_en = 0;
             hot_write_en = 1;
-            for(integer i = 0 ; i < 128; i = i + 1)begin  //128个MLU
+            for(integer i = 0 ; i < 49; i = i + 1)begin  //128个MLU
                 hot_idx = i;
                 for(integer j = 0; j < 16; j = j + 1)begin  //1个MLU有16个数
-                    if(i < 98)begin  
-                        hot_buff_in[j] = test_images[test_index+i/49][(i%49)*16+j];
-                    end else begin   //由于128个MLU的位置只保存2张图片，即只需49*2=98个MLU的位置，因此后面的位置赋0，保证计算是不会出现数据为xxxx_xxxx的情况
-                        hot_buff_in[j] = 0;
-                    end
+                    hot_buff_in[j] = layer1_input[(i%49)*16+j];
                     #2;
                 end
             end
+            //将1024个数据分成64段去求，每一段的最终数据求出来了，再求下一段
+            for(integer hor_portion_id = 0, col_start = 0; hor_portion_id < 64; hor_portion_id = hor_portion_id + 1)begin
 
-            for(integer test_img_id = 0; test_img_id < 2; test_img_id = test_img_id + 1)begin
-                //-----------------L1层输入图片的784个数据------------------------------------------------
+                col_start = 16 * hor_portion_id;
+                clear_reg_acc = 1;  //初始化寄存器的状态，避免出现32'hxxxx_xxxx + 任何数 依旧是32'hxxxx_xxxx的情况
+                #2; 
+                clear_reg_acc = 0;
 
+                //垂直取weights 784*1024的数据，取满ColdBuf共4轮，计算出最终的16/1024个数
+                for(integer ver_portion_id = 0, row_start = 0; ver_portion_id < 4; ver_portion_id++)begin   //需要遍历4轮，才能拿到计算完一张图片49+1个MLU的数据
+                    
+                    row_start = 256 * ver_portion_id;
 
-                //-----------------读取L2层的计算参数，784*1024，计算后得到1024个数据---------------------
-                //将1024个数据分成64段去求，每一段的最终数据求出来了，再求下一段
-                for(integer hor_portion_id = 0, col_start = 0; hor_portion_id < 64; hor_portion_id++)begin
-
-                    col_start = 16 * hor_portion_id;
-                    clear_reg_acc = 1;  //初始化寄存器的状态，避免出现32'hxxxx_xxxx + 任何数 依旧是32'hxxxx_xxxx的情况
-                    #2; 
-                    clear_reg_acc = 0;
-
-                    for(integer ver_portion_id = 0, row_start = 0; ver_portion_id < 4; ver_portion_id++)begin   //需要遍历4轮，才能拿到计算完一张图片49+1个MLU的数据
-                        
-                        row_start = 256 * ver_portion_id;
-
-                        //从内存读取64轮中的一轮参数到ColdBuffer;
-                        cold_read_en = 0;
-                        cold_write_en = 1;
-                        //------------------向ColdBuffer写入部分权重参数---------------------
-                        for(integer i = 0; i < 16; i = i + 1)begin  //16组MLU
-                            cold_idx = i;
-                            for(integer j = 0; j < 16; j = j + 1)begin  //每组16个MLU, j表示第几个MLU
-                                for(integer k = 0, row_num = 0 ; k < 16; k = k + 1)begin  //每个MLU16维数据
-                                    row_num = row_start+j*16+k;  //row_num表示二维数组的行数，最大为784
-                                    if(row_num <= 784)begin
-                                        cold_buff_in[j*16+k] = layer2_weights[row_start+j*16+k][col_start+k];
-                                    end else begin
-                                        cold_buff_in[j*16+k] = 0;
-                                    end
+                    //从内存读取64轮中的一轮参数到ColdBuffer;
+                    cold_read_en = 0;
+                    cold_write_en = 1;
+                    //------------------向ColdBuffer写入部分权重参数---------------------
+                    for(integer i = 0; i < 16; i = i + 1)begin  //16组MLU
+                        cold_idx = i;
+                        for(integer j = 0; j < 16; j = j + 1)begin  //每组16个MLU, j表示第几个MLU
+                            for(integer k = 0, row_num = 0 ; k < 16; k = k + 1)begin  //每个MLU16维数据
+                                row_num = row_start+j*16+k;  //row_num表示二维数组的行数，最大为784
+                                if(row_num <= 784)begin
+                                    cold_buff_in[j*16+k] = layer1_weights[row_start+j*16+k][col_start+k];
+                                end else begin
+                                    cold_buff_in[j*16+k] = 0;
                                 end
-                                #2;
                             end
+                            #2;
                         end
+                    end
 
-                        //开始从ColdBuffer和HotBuffer读数据到一组MLU中
-                        hot_read_en = 1;
-                        hot_write_en = 0;
-                        cold_read_en = 1;
-                        cold_write_en = 0;
-                        for(integer cold_mlus_id = 0; cold_mlus_id < 16; cold_mlus_id = cold_mlus_id + 1)begin
-                            //从ColdBuffer和HotBuffer读取一组共计16MLU的数据进行计算
-                            cold_idx = cold_mlus_id;
-                            hot_idx = ver_portion_id * 16 + cold_mlus_id;
-                            symbol = 2'b01;
-                            #2;    //给时间记录数据
-                            sel_in = 1;  //选择从HotBuf和ColdBuf直接传递过来的数据
-                            shift_right = 8'b00010000;  //右移16位
-                            fun_id = 3'b0;  // 暂时用不上非线性函数
-                            asce = 1'b1;
+                    //开始从ColdBuffer和HotBuffer读数据到一组MLU中
+                    hot_read_en = 1;
+                    hot_write_en = 0;
+                    cold_read_en = 1;
+                    cold_write_en = 0;
+                    for(integer cold_mlus_id = 0; cold_mlus_id < 16; cold_mlus_id = cold_mlus_id + 1)begin
+                        //从ColdBuffer和HotBuffer读取一组共计16MLU的数据进行计算
+                        cold_idx = cold_mlus_id;
+                        hot_idx = ver_portion_id * 16 + cold_mlus_id;
+                        symbol = 2'b01;
+                        #2;    //给时间记录数据
+                        sel_in = 1;  //选择从HotBuf和ColdBuf直接传递过来的数据
+                        shift_right = 8'b00010000;  //右移16位
+                        fun_id = 3'b0;  // 暂时用不上非线性函数
+                        asce = 1'b1;
 
-                            if(hot_idx == 50)begin   //多一个是image的全1行乘以biases值
-                                //输出到OutputBuf
-                                sel_output = 3'b100;   //sel_6选择Acc作为MLU输出
-                                is_output = 1;        //Acc输出到sel_6模块
-                                #4;
-                                is_output = 0;    //清空为0了，避免0输出
-                                alu_select = 2'b01;  //选择来自MLU的输入
-                                alu_in_count = 0;
-                                alu_out_count = 0;
-                                alu_run_case = 4'b0011;  //保存MLU的out_scale然后输出
-                                output_read_en = 0;
-                                output_write_en = 1;
-                                outbuf_idx = hor_portion_id/16;
-                            end else begin
-                                //部分和保存到Acc为止
-                                is_output = 0;
-                                sel_output = 3'b0;  //MLU不输出
-                            end
+                        if(hot_idx >= 49)begin   //多一个是image的全1行乘以biases值
+                            // alu_run_case = 4'b0100;  //清除ALU之前的输出数据，避免造成干扰
+                            // #4;
+                            //输出到OutputBuf
+                            sel_output = 3'b100;   //sel_6选择Acc作为MLU输出
+                            is_output = 1;        //Acc输出到sel_6模块
+                            #4;
+                            is_output = 0;    //清空为0了，避免0输出
+                            alu_select = 2'b01;  //选择来自MLU的输入
+                            alu_in_count = 0;
+                            alu_out_count = 0;
+                            alu_run_case = 4'b0011;  //保存MLU的out_scale然后输出
+                            output_read_en = 0;
+                            output_write_en = 1;
+                            outbuf_idx = hor_portion_id/16;
+                            #4;
                             alu_select = 0;
                             alu_out_count = 32'hxxxx_xxxx;
-                            #4;
+                            break;
+                        end else begin
+                            //部分和保存到Acc为止
+                            is_output = 0;
+                            sel_output = 3'b0;  //MLU不输出
                         end
-
+                        
                     end
-                    
+
                 end
             end
+            //-----------------计算L1层结果finish------------------------------------------------
+
+
+            //-----------------计算L2层结果start------------------------------------------------
+            //加载L2层的输入和权重数据
+            load_layer2_inputs();
+            //读取Larer2_input数据到Hotbuffer
+            hot_read_en = 0;
+            hot_write_en = 1;
+            for(integer i = 0 ; i < 64; i = i + 1)begin
+                hot_idx = i;
+                for(integer j = 0; j < 16; j = j + 1)begin  //1个MLU有16个数
+                    hot_buff_in[j] = layer2_input[i*16+j];
+                    #2;
+                end
+            end
+            //-----------------读取L2层的计算参数，1024*512，计算后得到512个数据---------------------
+            //将512个数据分成32段去求，每一段的最终数据求出来了，再求下一段
+            for(integer hor_portion_id = 0, col_start = 0; hor_portion_id < 32; hor_portion_id = hor_portion_id + 1)begin
+
+                col_start = 16 * hor_portion_id;
+                clear_reg_acc = 1;  //初始化寄存器的状态，避免出现32'hxxxx_xxxx + 任何数 依旧是32'hxxxx_xxxx的情况
+                #2; 
+                clear_reg_acc = 0;
+
+                //垂直取weights 1025*512的数据，取满ColdBuf共5轮，计算出最终的16/512个数
+                for(integer ver_portion_id = 0, row_start = 0; ver_portion_id < 5; ver_portion_id++)begin   //需要遍历5轮，才能拿到计算完1024+biases的数据
+                    
+                    row_start = 256 * ver_portion_id; //当row_start=1024的时候就是计算偏置值的时候了
+
+                    //从内存读取32轮中的一轮参数到ColdBuffer;
+                    cold_read_en = 0;
+                    cold_write_en = 1;
+                    //------------------向ColdBuffer写入部分权重参数---------------------
+                    for(integer i = 0; i < 16; i = i + 1)begin  //16组MLU
+                        cold_idx = i;
+                        for(integer j = 0; j < 16; j = j + 1)begin  //每组16个MLU, j表示第几个MLU
+                            for(integer k = 0, row_num = 0 ; k < 16; k = k + 1)begin  //每个MLU16维数据
+                                row_num = row_start+j*16+k;  //row_num表示二维数组的行数，最大为1024
+                                if(row_num <= 1024)begin
+                                    cold_buff_in[j*16+k] = layer2_weights[row_start+j*16+k][col_start+k];
+                                end else begin
+                                    cold_buff_in[j*16+k] = 0;
+                                end
+                            end
+                            #2;
+                        end
+                    end
+
+                    //开始从ColdBuffer和HotBuffer读数据到一组MLU中
+                    hot_read_en = 1;
+                    hot_write_en = 0;
+                    cold_read_en = 1;
+                    cold_write_en = 0;
+                    for(integer cold_mlus_id = 0; cold_mlus_id < 16; cold_mlus_id = cold_mlus_id + 1)begin
+                        //从ColdBuffer和HotBuffer读取一组共计16MLU的数据进行计算
+                        cold_idx = cold_mlus_id;
+                        hot_idx = ver_portion_id * 16 + cold_mlus_id;
+                        symbol = 2'b01;
+                        #2;    //给时间记录数据
+                        sel_in = 1;  //选择从HotBuf和ColdBuf直接传递过来的数据
+                        shift_right = 8'b00010000;  //右移16位
+                        fun_id = 3'b0;  // 暂时用不上非线性函数
+                        asce = 1'b1;
+
+                        if(hot_idx >= 64)begin   //多一个是输入的全1行乘以biases值
+                            // alu_run_case = 4'b0100;  //清除ALU之前的输出数据，避免造成干扰
+                            // #4;
+                            //输出到OutputBuf
+                            sel_output = 3'b100;   //sel_6选择Acc作为MLU输出
+                            is_output = 1;        //Acc输出到sel_6模块
+                            #4;
+                            is_output = 0;    //清空为0了，避免0输出
+                            alu_select = 2'b01;  //选择来自MLU的输入
+                            alu_in_count = 0;
+                            alu_out_count = 0;
+                            alu_run_case = 4'b0011;  //保存MLU的out_scale然后输出
+                            output_read_en = 0;
+                            output_write_en = 1;
+                            outbuf_idx = 4+ hor_portion_id/16;
+                            #4;
+                            alu_select = 0;
+                            alu_out_count = 32'hxxxx_xxxx;
+                            break;
+                        end else begin
+                            //部分和保存到Acc为止
+                            is_output = 0;
+                            sel_output = 3'b0;  //MLU不输出
+                        end
+                        
+                    end
+
+                end
+            end
+            //-----------------计算L2层结果finish------------------------------------------------
+
+
+            //-----------------计算L3层结果start------------------------------------------------
+            //加载L3层的输入和权重数据
+            load_layer3_inputs();
+            //读取layer3_input数据到Hotbuffer
+            hot_read_en = 0;
+            hot_write_en = 1;
+            for(integer i = 0 ; i < 32; i = i + 1)begin
+                hot_idx = i;
+                for(integer j = 0; j < 16; j = j + 1)begin  //1个MLU有16个数
+                    hot_buff_in[j] = layer3_input[i*16+j];
+                    #2;
+                end
+            end
+            //-----------------读取L3层的计算参数，512*256，计算后得到256个数据---------------------
+            //将256个数据分成16段去求，每一段的最终数据求出来了，再求下一段
+            for(integer hor_portion_id = 0, col_start = 0; hor_portion_id < 16; hor_portion_id = hor_portion_id + 1)begin
+
+                col_start = 16 * hor_portion_id;
+                clear_reg_acc = 1;  //初始化寄存器的状态，避免出现32'hxxxx_xxxx + 任何数 依旧是32'hxxxx_xxxx的情况
+                #2; 
+                clear_reg_acc = 0;
+
+                //垂直取weights 513*256的数据，取满ColdBuf共3轮，计算出最终的16/256个数
+                for(integer ver_portion_id = 0, row_start = 0; ver_portion_id < 3; ver_portion_id++)begin   //需要遍历3轮，才能拿到计算完512+biases的数据
+                    
+                    row_start = 256 * ver_portion_id; //当row_start=512的时候就是计算偏置值的时候了
+
+                    //从内存读取32轮中的一轮参数到ColdBuffer;
+                    cold_read_en = 0;
+                    cold_write_en = 1;
+                    //------------------向ColdBuffer写入部分权重参数---------------------
+                    for(integer i = 0; i < 16; i = i + 1)begin  //16组MLU
+                        cold_idx = i;
+                        for(integer j = 0; j < 16; j = j + 1)begin  //每组16个MLU, j表示第几个MLU
+                            for(integer k = 0, row_num = 0 ; k < 16; k = k + 1)begin  //每个MLU16维数据
+                                row_num = row_start+j*16+k;  //row_num表示二维数组的行数，最大为512
+                                if(row_num <= 512)begin
+                                    cold_buff_in[j*16+k] = layer3_weights[row_start+j*16+k][col_start+k];
+                                end else begin
+                                    cold_buff_in[j*16+k] = 0;
+                                end
+                            end
+                            #2;
+                        end
+                    end
+
+                    //开始从ColdBuffer和HotBuffer读数据到一组MLU中
+                    hot_read_en = 1;
+                    hot_write_en = 0;
+                    cold_read_en = 1;
+                    cold_write_en = 0;
+                    for(integer cold_mlus_id = 0; cold_mlus_id < 16; cold_mlus_id = cold_mlus_id + 1)begin
+                        //从ColdBuffer和HotBuffer读取一组共计16MLU的数据进行计算
+                        cold_idx = cold_mlus_id;
+                        hot_idx = ver_portion_id * 16 + cold_mlus_id;
+                        symbol = 2'b01;
+                        #2;    //给时间记录数据
+                        sel_in = 1;  //选择从HotBuf和ColdBuf直接传递过来的数据
+                        shift_right = 8'b00010000;  //右移16位
+                        fun_id = 3'b0;  // 暂时用不上非线性函数
+                        asce = 1'b1;
+
+                        if(hot_idx >= 32)begin   //多一个是输入的全1行乘以biases值
+                            // alu_run_case = 4'b0100;  //清除ALU之前的输出数据，避免造成干扰
+                            // #4;
+                            //输出到OutputBuf
+                            sel_output = 3'b100;   //sel_6选择Acc作为MLU输出
+                            is_output = 1;        //Acc输出到sel_6模块
+                            #4;
+                            is_output = 0;    //清空为0了，避免0输出
+                            alu_select = 2'b01;  //选择来自MLU的输入
+                            alu_in_count = 0;
+                            alu_out_count = 0;
+                            alu_run_case = 4'b0011;  //保存MLU的out_scale然后输出
+                            output_read_en = 0;
+                            output_write_en = 1;
+                            outbuf_idx = 6+ hor_portion_id/16;
+                            #4;
+                            alu_select = 0;
+                            alu_out_count = 32'hxxxx_xxxx;
+                            break;
+                        end else begin
+                            //部分和保存到Acc为止
+                            is_output = 0;
+                            sel_output = 3'b0;  //MLU不输出
+                        end
+                        
+                    end
+
+                end
+            end
+            
+            //-----------------计算L3层结果finish------------------------------------------------
+            
+
+            //-----------------计算L4层结果start------------------------------------------------
+            //加载L4层的输入和权重数据
+            load_layer4_inputs();
+            //读取layer4_input数据到Hotbuffer
+            hot_read_en = 0;
+            hot_write_en = 1;
+            for(integer i = 0 ; i < 16; i = i + 1)begin
+                hot_idx = i;
+                for(integer j = 0; j < 16; j = j + 1)begin  //1个MLU有16个数
+                    hot_buff_in[j] = layer4_input[i*16+j];
+                    #2;
+                end
+            end
+            //-----------------读取L4层的计算参数，256*10，计算后得到10个数据---------------------
+            //10个数据不用按照每段16个划分，直接一次就求出来了
+            alu_run_case = 4'b0100;  //清除ALU之前的输出数据，避免造成干扰
+            #4
+            for(integer hor_portion_id = 0, col_start = 0; hor_portion_id < 1; hor_portion_id = hor_portion_id + 1)begin
+
+                col_start = 16 * hor_portion_id;
+                clear_reg_acc = 1;  //初始化寄存器的状态，避免出现32'hxxxx_xxxx + 任何数 依旧是32'hxxxx_xxxx的情况
+                #2; 
+                clear_reg_acc = 0;
+
+                //垂直取weights 257*10的数据，取满ColdBuf共2轮，计算出最终的10个数
+                for(integer ver_portion_id = 0, row_start = 0; ver_portion_id < 2; ver_portion_id++)begin   //需要遍历3轮，才能拿到计算完512+biases的数据
+                    
+                    row_start = 256 * ver_portion_id; //当row_start=512的时候就是计算偏置值的时候了
+
+                    //从内存读取32轮中的一轮参数到ColdBuffer;
+                    cold_read_en = 0;
+                    cold_write_en = 1;
+                    //------------------向ColdBuffer写入部分权重参数---------------------
+                    for(integer i = 0; i < 16; i = i + 1)begin  //16组MLU
+                        cold_idx = i;
+                        for(integer j = 0; j < 16; j = j + 1)begin  //每组16个MLU, j表示第几个MLU
+                            for(integer k = 0, row_num = 0 ; k < 16; k = k + 1)begin  //每个MLU16维数据
+                                row_num = row_start+j*16+k;  //row_num表示二维数组的行数，最大为512
+                                if(row_num <= 256)begin
+                                    cold_buff_in[j*16+k] = layer4_weights[row_start+i*16+k][col_start+j];
+                                end else begin
+                                    cold_buff_in[j*16+k] = 0;
+                                end
+                            end
+                            #2;
+                        end
+                    end
+
+                    //开始从ColdBuffer和HotBuffer读数据到一组MLU中
+                    hot_read_en = 1;
+                    hot_write_en = 0;
+                    cold_read_en = 1;
+                    cold_write_en = 0;
+                    for(integer cold_mlus_id = 0; cold_mlus_id < 16; cold_mlus_id = cold_mlus_id + 1)begin
+                        //从ColdBuffer和HotBuffer读取一组共计16MLU的数据进行计算
+                        cold_idx = cold_mlus_id;
+                        hot_idx = ver_portion_id * 16 + cold_mlus_id;
+                        symbol = 2'b01;
+                        #2;    //给时间记录数据
+                        sel_in = 1;  //选择从HotBuf和ColdBuf直接传递过来的数据
+                        shift_right = 8'b00010000;  //右移16位
+                        fun_id = 3'b0;  // 暂时用不上非线性函数
+                        asce = 1'b1;
+
+                        if(hot_idx >= 16)begin   //多一个是输入的全1行乘以biases值
+                            //输出到OutputBuf
+                            sel_output = 3'b100;   //sel_6选择Acc作为MLU输出
+                            is_output = 1;        //Acc输出到sel_6模块
+                            #4;
+                            is_output = 0;    //清空为0了，避免0输出
+                            alu_select = 2'b01;  //选择来自MLU的输入
+                            alu_in_count = 0;
+                            alu_out_count = 1;  //直接输出部分结果
+                            alu_run_case = 4'b0011;  //保存MLU的out_scale然后输出
+                            output_read_en = 0;
+                            output_write_en = 1;
+                            outbuf_idx = 7+ hor_portion_id/16;
+                            #4;
+                            alu_select = 0;
+                            alu_out_count = 32'hxxxx_xxxx;
+                            break;
+                        end else begin
+                            //部分和保存到Acc为止
+                            is_output = 0;
+                            sel_output = 3'b0;  //MLU不输出
+                        end
+                        
+                    end
+
+                end
+            end
+            
+            //-----------------计算L4层结果finish------------------------------------------------
          #4;
          end
 

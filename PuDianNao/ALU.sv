@@ -7,9 +7,9 @@ module ALU #(parameter K = 20)(
     input[31:0]         in_output[15:0],         //来自OutputBuffer的输入,包括数据和index
     input[31:0]         in_count,                   //输入第几波数据计数
     input[31:0]         out_count,                   //输出第几波数据计数
-    input[3:0]          run_case,                //开始进行各种case的逻辑运算, 4'b0001 表示输出MLU到OutputBuf ,  4'b0010 表示排序MLU和OutputBuf的结果然后输出到OutputBuf , 4'b0011 表示将输入in进行存储，存够16个数后直接输出
+    input[3:0]          run_case,                //开始进行各种case的逻辑运算, 4'b0001 表示输出MLU到OutputBuf ,  4'b0010 表示排序MLU和OutputBuf的结果然后输出到OutputBuf , 
     input               is_asce_sort,            //较小的输出
-    output[31:0]        out[15:0]
+    output reg[31:0]    out[15:0]
 
 );
 reg[31:0]       new_data[K-1:0];     //新输入数据，来自新一轮计算的MLU
@@ -21,7 +21,6 @@ reg[31:0]       new_sorted_index[K-1:0];
 
 reg [31:0]      debug_out_vector_collect[((2*K)/16+1)*16-1:0];
 reg[31:0]       debug_out_ksort[2*K-1:0];
-reg[31:0]       out[15:0];
 reg[31:0]       save_out[15:0];  //用与保存in的数据
 integer         save_count = 0;    //保存的数据in的数量
 reg             is_saved;      //in输入是否已经保存过
@@ -105,16 +104,32 @@ always @ (posedge clk or negedge rst) begin
                     //包装排序后的新数组输出
                     package_data(out_count, new_sorted_data, new_sorted_index, out);
                 end
-            4'b0011:
+            4'b0011:  //4'b0011 表示将输入in进行存储，存够16个数后自动输出，或者给out_count>0的值，强制输出
                 begin
                     if(!is_saved)begin
                         save_out[save_count] = in;
                         save_count = save_count + 1;
                         is_saved = 1;
-                        if(save_count >= 16)begin  //直接输出
+                        if(save_count >= 16)begin  //攒到了16个数自动输出
                             out[15:0] = save_out[15:0];
                             save_count = 0;
+                        end else if(out_count > 0)begin  //直接输出
+                            for(integer i = 0; i < 16; i = i + 1)begin
+                                if(i < save_count)begin
+                                    out[i] = save_out[i];
+                                end else begin
+                                    out[i] = 32'hxxxx_xxxx;
+                                end
+                            end
                         end
+                    end
+                end
+            4'b0100:  //清除之前的输出数据
+                begin
+                    save_count = 0;
+                    for (integer i = 0; i < 16 ; i = i + 1) begin
+                        out[i] = 32'hxxxx_xxxx;
+                        save_out[i] = 32'hxxxx_xxxx;
                     end
                 end
         endcase
