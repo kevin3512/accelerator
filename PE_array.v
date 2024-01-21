@@ -19,6 +19,7 @@ module PE_array(
     input [7:0]         Sel_adder,           
     input [3:0]         Is_save_cu_out,    //这个信号有两个功能，1，保存cu_out的输出到寄存器save_cu_out寄存器 ， 2，禁止cu计算结果保存到cu_out
     input               Clear_reg,     //clear all reg value          
+    input               Is_shift_right,   //是否需要右移16位，反量化操作
     
                         //control output model(one row PE or one column PE or one PE or all PE)
     input [1:0]         Sum_row_pe,               
@@ -373,6 +374,7 @@ generate
             .Sel_adder(all_sel_adder[i][7:6]),
             .Is_save_cu_out(all_is_save_cu_out[i][3]),
             .Clear_reg(Clear_reg),
+            .Is_shift_right(Is_shift_right),
             .Out_total(pe_scalar_output[i]),
             .Out0(pe_array_output[i][0]), .Out1(pe_array_output[i][1]), .Out2(pe_array_output[i][2]), .Out3(pe_array_output[i][3]), .Out4(pe_array_output[i][4]), .Out5(pe_array_output[i][5]), .Out6(pe_array_output[i][6]), .Out7(pe_array_output[i][7]), 
             .Out8(pe_array_output[i][8]), .Out9(pe_array_output[i][9]), .Out10(pe_array_output[i][10]), .Out11(pe_array_output[i][11]), .Out12(pe_array_output[i][12]), .Out13(pe_array_output[i][13]), .Out14(pe_array_output[i][14]), .Out15(pe_array_output[i][15])
@@ -389,6 +391,7 @@ generate
             .Sel_adder(all_sel_adder[i][5:4]),
             .Is_save_cu_out(all_is_save_cu_out[i][2]),
             .Clear_reg(Clear_reg),
+            .Is_shift_right(Is_shift_right),
             .Out_total(pe_scalar_output[8+i]),
             .Out0(pe_array_output[i][16]), .Out1(pe_array_output[i][17]), .Out2(pe_array_output[i][18]), .Out3(pe_array_output[i][19]), .Out4(pe_array_output[i][20]), .Out5(pe_array_output[i][21]), .Out6(pe_array_output[i][22]), .Out7(pe_array_output[i][23]), 
             .Out8(pe_array_output[i][24]), .Out9(pe_array_output[i][25]), .Out10(pe_array_output[i][26]), .Out11(pe_array_output[i][27]), .Out12(pe_array_output[i][28]), .Out13(pe_array_output[i][29]), .Out14(pe_array_output[i][30]), .Out15(pe_array_output[i][31])
@@ -405,6 +408,7 @@ generate
             .Sel_adder(all_sel_adder[i][3:2]),
             .Is_save_cu_out(all_is_save_cu_out[i][1]),
             .Clear_reg(Clear_reg),
+            .Is_shift_right(Is_shift_right),
             .Out_total(pe_scalar_output[16+i]),
             .Out0(pe_array_output[i][32]), .Out1(pe_array_output[i][33]), .Out2(pe_array_output[i][34]), .Out3(pe_array_output[i][35]), .Out4(pe_array_output[i][36]), .Out5(pe_array_output[i][37]), .Out6(pe_array_output[i][38]), .Out7(pe_array_output[i][39]), 
             .Out8(pe_array_output[i][40]), .Out9(pe_array_output[i][41]), .Out10(pe_array_output[i][42]), .Out11(pe_array_output[i][43]), .Out12(pe_array_output[i][44]), .Out13(pe_array_output[i][45]), .Out14(pe_array_output[i][46]), .Out15(pe_array_output[i][47])
@@ -421,6 +425,7 @@ generate
             .Sel_adder(all_sel_adder[i][1:0]),
             .Is_save_cu_out(all_is_save_cu_out[i][0]),
             .Clear_reg(Clear_reg),
+            .Is_shift_right(Is_shift_right),
             .Out_total(pe_scalar_output[24+i]),
             .Out0(pe_array_output[i][48]), .Out1(pe_array_output[i][49]), .Out2(pe_array_output[i][50]), .Out3(pe_array_output[i][51]), .Out4(pe_array_output[i][52]), .Out5(pe_array_output[i][53]), .Out6(pe_array_output[i][54]), .Out7(pe_array_output[i][55]),  
             .Out8(pe_array_output[i][56]), .Out9(pe_array_output[i][57]), .Out10(pe_array_output[i][58]), .Out11(pe_array_output[i][59]), .Out12(pe_array_output[i][60]), .Out13(pe_array_output[i][61]), .Out14(pe_array_output[i][62]), .Out15(pe_array_output[i][63])

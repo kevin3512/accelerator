@@ -5,8 +5,8 @@ module test_knn;
     parameter         TEST_IMAGE_NUM = 10000;
     parameter         IMAGE_SIZE = 784;   //28*28
     parameter         BUFFER_SIZE = 2048;  //4 块 512
-    parameter         TEST_N = 6144;     //实际运行的测试用例数量
-    parameter         REF_N = 1000;      //实际运行的参考用例数量（训练集）
+    parameter         TEST_N = 10;     //实际运行的测试用例数量
+    parameter         REF_N = 60;      //实际运行的参考用例数量（训练集）
     reg               clk;
     reg               rst;
     reg [31:0]        in[3:0][15:0];       
@@ -224,10 +224,10 @@ module test_knn;
     );
 
     //累加模块
-    acc_out acc_inst(.clk(clk), .rst(rst), .sig(acc_sig), .data(scalar_output[0]), .isStop(acc_is_stop), .out(acc_scalar_output), .clear_reg(clear_reg_acc));
+    acc_out acc_inst(.clk(clk), .rst(rst), .sig(acc_sig), .data0(scalar_output[0]), .isStop0(acc_is_stop), .out0(acc_scalar_output), .clear_reg0(clear_reg_acc));
 
     //排序模块
-    sort_relu sort_isnt(.clk(clk), .rst(rst), .in(acc_scalar_output), .index(sort_ref_index), .asce(1'b1), .is_start(1'b1), .clear_reg(clear_reg_sort)); 
+    sort_relu sort_isnt(.clk(clk), .rst(rst), .in(acc_scalar_output), .index(sort_ref_index), .sig(4'b0001), .asce(1'b1), .is_output(1'b1), .clear_reg(clear_reg_sort)); 
 
     //输出保存
 

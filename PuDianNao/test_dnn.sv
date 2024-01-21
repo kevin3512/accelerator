@@ -4,7 +4,7 @@ module test_dnn;
     parameter                     TEST_IMAGE_NUM = 10000;
     parameter                     IMAGE_SIZE = 784;   //28*28
     parameter                     K = 20;
-    parameter                     TESE_N = 10;     //实际运行的测试用例数量
+    parameter                     TESE_N = 1000;     //实际运行的测试用例数量
     parameter                     REF_N = 1000;      //实际运行的参考用例数量（训练集）
     reg[7:0]                      ref_images[REF_IMAGE_NUM-1:0][IMAGE_SIZE-1:0];
     reg[7:0]                      ref_labels[REF_IMAGE_NUM-1:0]; 
@@ -570,7 +570,7 @@ module test_dnn;
     initial begin
         // 读取数据集和DNN模型参数到内存
         read_dataset_and_parameters(test_images, test_labels, layer1_weights, layer1_biases, layer2_weights, layer2_biases, layer3_weights, layer3_biases, layer4_weights, layer4_biases);
-        $display("layer2_weight:%h, layer2_weight:%h, layer3_weight:%h, layer4_weight:%h" , layer1_weights[783][1023], layer2_weights[1023][511], layer3_weights[511][255], layer4_weights[255][9]);
+        $display("layer1_weight:%h, layer2_weight:%h, layer3_weight:%h, layer4_weight:%h" , layer1_weights[783][1023], layer2_weights[1023][511], layer3_weights[511][255], layer4_weights[255][9]);
 
         for(integer kk1 = 0; kk1 < 10; kk1 = kk1 + 1)begin
             debug_test_image[kk1][783:0] = test_images[kk1][783:0];

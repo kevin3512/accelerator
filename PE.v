@@ -9,6 +9,7 @@ module PE(
     input[1:0]      Sel_adder,  //是否进入加法树的控制信号
     input           Is_save_cu_out,   //这个信号高电平时有两个功能，1，保存cu_out的输出到寄存器save_cu_out寄存器 ， 2，禁止cu计算结果保存到cu_out（因为会影响功能1，并且还有其他影响）
     input           Clear_reg,       //清除寄存器
+    input           Is_shift_right,  //是否反量化，右移16位
     output[31:0]    Out_total,       //输出和
     output[31:0]    Out0, Out1, Out2, Out3, Out4, Out5, Out6, Out7, Out8, Out9, Out10, Out11, Out12, Out13, Out14, Out15  //对应每个CU计算的结果输出
     
@@ -77,6 +78,7 @@ generate
       .Input_par(Par_data[j]),
       .Sel(Sel_cu),
       .Is_output(!Is_save_cu_out),
+      .Is_shift_right(Is_shift_right),
       .Out(cu_out[j])
     );
   end

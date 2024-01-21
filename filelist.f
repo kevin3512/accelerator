@@ -7,4 +7,7 @@
 ./sort_relu.v
 ./MLB.v
 ./acc_out.v
-./sv/test_knn.sv
+./InputBuffer.sv
+./ParameterBuffer.sv
+./OutputBuffer.sv
+./sv/PE_array_dnn.sv
