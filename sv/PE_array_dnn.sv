@@ -5,7 +5,7 @@ module test_dnn;
     parameter         TEST_IMAGE_NUM = 10000;
     parameter         IMAGE_SIZE = 784;   //28*28
     parameter         BUFFER_SIZE = 2048;  //4 块 512
-    parameter         TEST_N = 1;     //实际运行的测试用例数量
+    parameter         TEST_N = 1000;     //实际运行的测试用例数量
     parameter         REF_N = 1000;      //实际运行的参考用例数量（训练集）
     reg               clk;
     reg               rst;
@@ -75,25 +75,27 @@ module test_dnn;
 
     reg[4:0]          pe_idx;   //MLB一共32行PE存储空间, pe_idx表示第几行PE
     reg[3:0]          data_idx;  //PE一共有16个数，data_idx表示第几个数
+    reg               is_scalar;
 
     //排序模块需要
     reg               clear_reg_sort;   //清除排序模块内部寄存器数据
     integer           sort_ref_index;
     reg[1:0]          input_mlb_num;    //输入到4块OutputBuffer的MLB中的哪一块
     reg               is_output_relu;
-    reg[31:0]         sort_out[3:0];
+    reg[31:0]         relu_out[3:0];
 
     
     //acc累加模块需要的信号
     reg[2:0]          acc_sig;
     reg               acc_is_stop; 
     reg               clear_reg_acc;
-    wire[31:0]        acc_scalar_output;
+    wire[31:0]        acc_scalar_output[3:0];
 
     //debug
     reg[7:0]        debug_test_image[9:0][783:0];
     reg[7:0]        debug_ref_image[59:0][783:0];
     integer         debug_hor_portion_id;
+    reg[7:0]         debug;
 
     //Input buffer
     InputBuffer input_buf_ins(
@@ -124,8 +126,8 @@ module test_dnn;
     OutputBuffer output_buf_ins(
         .clk(clk),
         .rst(rst),
-        .is_scalar(1'b1),
-        .in_scalar(sort_out),
+        .is_scalar(is_scalar),
+        .in_scalar(relu_out),
         .pe_idx(pe_idx),
         .data_idx(data_idx),
         .output_read_en(output_read_en),
@@ -163,48 +165,55 @@ module test_dnn;
     );
 
     //累加模块
-    acc_out acc_inst(.clk(clk), .rst(rst), .sig(acc_sig), .data0(scalar_output[0]), .isStop0(acc_is_stop), .out0(acc_scalar_output), .clear_reg0(clear_reg_acc));
+    acc_out acc_inst(
+        .clk(clk), 
+        .rst(rst), 
+        .sig(acc_sig), 
+        .data0(scalar_output[0]), .data1(scalar_output[1]), .data2(scalar_output[2]), .data3(scalar_output[3]), 
+        .isStop0(acc_is_stop), .isStop1(acc_is_stop), .isStop2(acc_is_stop), .isStop3(acc_is_stop),
+        .out0(acc_scalar_output[0]), .out1(acc_scalar_output[1]), .out2(acc_scalar_output[2]), .out3(acc_scalar_output[3]), 
+        .clear_reg0(clear_reg_acc), .clear_reg1(clear_reg_acc), .clear_reg2(clear_reg_acc), .clear_reg3(clear_reg_acc));
 
     //排序模块
     sort_relu sort_isnt0(
         .clk(clk), 
         .rst(rst), 
-        .in(acc_scalar_output), 
+        .in(acc_scalar_output[0]), 
         .sig(4'b0010),     //ReLu激活函数
         .asce(1'b1), 
         .is_output(is_output_relu), 
         .clear_reg(clear_reg_sort), 
-        .out(sort_out[0])); 
+        .out(relu_out[0])); 
 
     sort_relu sort_isnt1(
         .clk(clk), 
         .rst(rst), 
-        .in(acc_scalar_output), 
+        .in(acc_scalar_output[1]), 
         .sig(4'b0010),     //ReLu激活函数
         .asce(1'b1), 
         .is_output(is_output_relu), 
         .clear_reg(clear_reg_sort), 
-        .out(sort_out[1])); 
+        .out(relu_out[1])); 
 
     sort_relu sort_isnt2(
         .clk(clk), 
         .rst(rst), 
-        .in(acc_scalar_output), 
+        .in(acc_scalar_output[2]), 
         .sig(4'b0010),     //ReLu激活函数
         .asce(1'b1), 
         .is_output(is_output_relu), 
         .clear_reg(clear_reg_sort), 
-        .out(sort_out[2])); 
+        .out(relu_out[2])); 
 
     sort_relu sort_isnt3(
         .clk(clk), 
         .rst(rst), 
-        .in(acc_scalar_output), 
+        .in(acc_scalar_output[3]), 
         .sig(4'b0010),     //ReLu激活函数
         .asce(1'b1), 
         .is_output(is_output_relu), 
         .clear_reg(clear_reg_sort), 
-        .out(sort_out[3])); 
+        .out(relu_out[3])); 
 
     //输出保存
     initial begin              
@@ -302,56 +311,57 @@ module test_dnn;
     task load_layer2_inputs;
         output_read_en = 1;
         output_write_en = 0;
+        is_scalar = 0;
 
         sub_tile_idx_out = 0;
         unit_tile_idx_out = 0;
-        #4
+        #8
         layer2_input[63:0] = wire_output_buf_out[63:0];
         unit_tile_idx_out = 1;
-        #4
+        #8
         layer2_input[127:64] = wire_output_buf_out[63:0];
         unit_tile_idx_out = 2;
-        #4
+        #8
         layer2_input[191:128] = wire_output_buf_out[63:0];
         unit_tile_idx_out = 3;
-        #4
+        #8
         layer2_input[255:192] = wire_output_buf_out[63:0];
         unit_tile_idx_out = 4;
-        #4
+        #8
         layer2_input[319:256] = wire_output_buf_out[63:0];
         unit_tile_idx_out = 5;
-        #4
+        #8
         layer2_input[383:320] = wire_output_buf_out[63:0];
         unit_tile_idx_out = 6;
-        #4
+        #8
         layer2_input[447:384] = wire_output_buf_out[63:0];
         unit_tile_idx_out = 7;
-        #4
+        #8
         layer2_input[511:448] = wire_output_buf_out[63:0];
         sub_tile_idx_out = 1;
-        unit_tile_idx_out = 8;
-        #4
+        unit_tile_idx_out = 0;
+        #8
         layer2_input[575:512] = wire_output_buf_out[63:0];
-        unit_tile_idx_out = 9;
-        #4
+        unit_tile_idx_out = 1;
+        #8
         layer2_input[639:576] = wire_output_buf_out[63:0];
-        unit_tile_idx_out = 10;
-        #4
+        unit_tile_idx_out = 2;
+        #8
         layer2_input[703:640] = wire_output_buf_out[63:0];
-        unit_tile_idx_out = 11;
-        #4
+        unit_tile_idx_out = 3;
+        #8
         layer2_input[767:704] = wire_output_buf_out[63:0];
-        unit_tile_idx_out = 12;
-        #4
+        unit_tile_idx_out = 4;
+        #8
         layer2_input[831:768] = wire_output_buf_out[63:0];
-        unit_tile_idx_out = 13;
-        #4
+        unit_tile_idx_out = 5;
+        #8
         layer2_input[895:832] = wire_output_buf_out[63:0];
-        unit_tile_idx_out = 14;
-        #4
+        unit_tile_idx_out = 6;
+        #8
         layer2_input[959:896] = wire_output_buf_out[63:0];
-        unit_tile_idx_out = 15;
-        #4
+        unit_tile_idx_out = 7;
+        #8
         layer2_input[1023:960] = wire_output_buf_out[63:0];
 
         layer2_input[1024] = 1;  //最后一个给1是为了和biases相乘计算
@@ -363,31 +373,32 @@ module test_dnn;
     task load_layer3_inputs;
         output_read_en = 1;
         output_write_en = 0;
+        is_scalar = 0;
 
         sub_tile_idx_out = 2;
         unit_tile_idx_out = 0;
-        #4
+        #8
         layer3_input[63:0] = wire_output_buf_out[63:0];
         unit_tile_idx_out = 1;
-        #4
+        #8
         layer3_input[127:64] = wire_output_buf_out[63:0];
         unit_tile_idx_out = 2;
-        #4
+        #8
         layer3_input[191:128] = wire_output_buf_out[63:0];
         unit_tile_idx_out = 3;
-        #4
+        #8
         layer3_input[255:192] = wire_output_buf_out[63:0];
         unit_tile_idx_out = 4;
-        #4
+        #8
         layer3_input[319:256] = wire_output_buf_out[63:0];
         unit_tile_idx_out = 5;
-        #4
+        #8
         layer3_input[383:320] = wire_output_buf_out[63:0];
         unit_tile_idx_out = 6;
-        #4
+        #8
         layer3_input[447:384] = wire_output_buf_out[63:0];
         unit_tile_idx_out = 7;
-        #4
+        #8
         layer3_input[511:448] = wire_output_buf_out[63:0];
 
         layer3_input[512] = 1;  //最后一个给1是为了和biases相乘计算
@@ -399,19 +410,20 @@ module test_dnn;
     task load_layer4_inputs;
         output_read_en = 1;
         output_write_en = 0;
+        is_scalar = 0;
 
         sub_tile_idx_out = 3;
         unit_tile_idx_out = 0;
-        #4
+        #8
         layer4_input[63:0] = wire_output_buf_out[63:0];
         unit_tile_idx_out = 1;
-        #4
+        #8
         layer4_input[127:64] = wire_output_buf_out[63:0];
         unit_tile_idx_out = 2;
-        #4
+        #8
         layer4_input[191:128] = wire_output_buf_out[63:0];
         unit_tile_idx_out = 3;
-        #4
+        #8
         layer4_input[255:192] = wire_output_buf_out[63:0];
 
         layer4_input[256] = 1;  //最后一个给1是为了和biases相乘计算
@@ -432,10 +444,12 @@ module test_dnn;
         end
         //总共对多少张测试图片进行分类
         for(test_index = 0; test_index < TEST_N; test_index = test_index + 1)begin
+            $display("正在计算第%0d张测试图片的分类结果", test_index);
+            //-------------------------------计算L1层结果start-------------------------
+            debug = 8'h10;
             //加载L1层的输入和权重数据
             load_layer1_inputs();
-            
-            //-------------------------------计算L1层结果start-------------------------
+            debug = 8'h11;
             //写入一张图片数据到InputBuffer
             input_read_en = 0;
             input_write_en = 1;
@@ -456,8 +470,10 @@ module test_dnn;
                 end
                 
             end
+            debug = 8'h12;
             //开始进行L1层的数据计算，将1024个数据分成256段去求，每一段的4个值求出来了，再求下一段
             for(integer hor_portion_id = 0, col_start = 0; hor_portion_id < 256; hor_portion_id = hor_portion_id + 1)begin
+                debug = 8'h13;
                 debug_hor_portion_id = hor_portion_id;
                 col_start = 4 * hor_portion_id;
                 clear_reg_acc = 1;  //清除累加值acc_data，避免第二段数据求值的时候，继续被累加sub_idx
@@ -465,6 +481,7 @@ module test_dnn;
                 clear_reg_acc = 0;
                 //垂直取weights（784*1024）的数据，取满InputBuf共2轮，计算出最终的4/1024个数
                 for(integer ver_portion_id = 0, row_start = 0; ver_portion_id < 2; ver_portion_id = ver_portion_id + 1)begin 
+                    debug = 8'h14;
                     row_start = 512 * ver_portion_id;  //每组取32个PE的数据，每个PE取16个数
                     select_mlb = ver_portion_id;
                     //从内存中读满参数到parameter中
@@ -516,23 +533,28 @@ module test_dnn;
                             #4
                             sel_adder = 8'b10101010;  //adder tree
                             #4;   
-                            if(ver_portion_id == 1 && unit_idx == 7)begin  //表示2轮InputBuf和ParmeterBuf的数据都读取完了，Acc累加完毕, acc保存的就是最终值，进入下一步激活ReLu
+                            if(ver_portion_id == 1 && sub_idx == 2 && unit_idx == 1)begin  //表示2轮InputBuf和ParmeterBuf的数据都读取完了，Acc累加完毕, acc保存的就是最终值，进入下一步激活ReLu
+                                debug = 8'h1f;
                                 //acc输入到ReLu
                                 #4;  //这里需要等一下PE array的结果出来之后再输出
                                 acc_is_stop = 1;  //输出结果，然后等2个时间单位，再清除累加和
-                                #4
-                                acc_is_stop = 0;  
+                                is_scalar = 1;
                                 //ReLu输入到OutputBuf
                                 is_output_relu = 1;
                                 //写入OutputBuf相关信号准备
                                 output_write_en = 1;
                                 output_read_en = 0;
+                                
                                 data_idx = hor_portion_id % 16;   //一组hor_portion循环保存4个数，16个保存64个数
                                 pe_idx = hor_portion_id / 16;
+                                #4
+                                acc_is_stop = 0;  
                                 //PE array 8列数据计算完成，清除内部累加寄存器，否则第二次循环的话，会把上一次的值累加
                                 clear_reg_acc = 1'b1;
                                 #2
                                 clear_reg_acc = 1'b0;
+                                output_write_en = 0;
+                                output_read_en = 0;
                             end else begin   //数据输出到acc就结束了（4个数）
                                 acc_is_stop = 0;
                             end
@@ -541,8 +563,355 @@ module test_dnn;
                         end
                     end
                 end
-
             end
+            //--------------------------------计算L1层结果finish-----------------------
+
+            //-------------------------------计算L2层结果start-------------------------
+            debug = 8'h20;
+            //加载L2层的输入和权重数据
+            load_layer2_inputs();
+            debug = 8'h21;
+            //写入L2层的输入数据到InputBuffer
+            input_read_en = 0;
+            input_write_en = 1;
+            for(integer col = 0, num = 0; col < 3; col = col + 1)begin  //1024个数保存2列，第3列保存一个1
+                select_mlb = col;
+                for(integer row = 0; row < 32; row = row + 1)begin  //第一、二列保存32行，第三列保存1个数(biase)
+                    sub_tile_idx_in = row / 8;
+                    unit_tile_idx_in = row % 8;
+                    for(integer k = 0; k < 16; k = k + 1)begin
+                        num = col*512+row*16+k;
+                        if(num <= 1024)begin
+                            input_buf_in[k] = layer2_input[num];  //按列优先的顺序来依次写入到InputBuf
+                        end else begin
+                            input_buf_in[k] = 0;
+                        end
+                    end
+                    #2;
+                end
+                
+            end
+            debug = 8'h22;
+            //开始进行L2层的数据计算，将512个数据分成128段去求，每一段的4个值求出来了，再求下一段
+            for(integer hor_portion_id = 0, col_start = 0; hor_portion_id < 128; hor_portion_id = hor_portion_id + 1)begin
+                debug_hor_portion_id = hor_portion_id;
+                col_start = 4 * hor_portion_id;
+                clear_reg_acc = 1;  //清除累加值acc_data，避免第二段数据求值的时候，继续被累加sub_idx
+                #2
+                clear_reg_acc = 0;
+                //垂直取weights（1025*512）的数据，取满InputBuf共2轮，计算出最终的4/512个数
+                for(integer ver_portion_id = 0, row_start = 0; ver_portion_id < 3; ver_portion_id = ver_portion_id + 1)begin 
+                    row_start = 512 * ver_portion_id;  //每组取32个PE的数据，每个PE取16个数
+                    select_mlb = ver_portion_id;
+                    //从内存中读满参数到parameter中
+                    par_write_en = 1;
+                    par_read_en = 0; 
+                    for(integer i = 0, row_num = 0; i < 32; i++)begin  //总共32行
+                        for(int j = 0; j < 4; j++)begin   //4列
+                            for(int k = 0; k < 16; k++)begin //每个PE有16个数
+                                row_num = row_start+j*16+k;
+                                sub_tile_idx_par = i/8;
+                                unit_tile_idx_par = i%8;
+                                if(row_num <= 1024)begin
+                                    par_buf_in[j*16+k] = layer2_weights[row_start+i*16+k][col_start+j];
+                                end else begin
+                                    par_buf_in[j*16+k] = 0;
+                                end
+                            end
+                            #2;
+                        end
+                    end
+
+                    //从InputBuf和ParmeterBuf开始读数据到PE array中计算
+                    input_read_en = 1;
+                    input_write_en = 0;
+                    par_read_en = 1;
+                    par_write_en = 0;
+                    for(integer sub_idx = 0; sub_idx < 4; sub_idx ++)begin  //4轮PE-array才能计算完全部InputBuf和ParBuf
+                        sub_tile_idx_in = sub_idx;
+                        sub_tile_idx_par = sub_idx;
+                        sum_row_pe = 2'b10;    
+                        sum_column_pe = 2'b01;  // 输出一行PE的和到scalar_out[3:0]
+                        is_save_cu_out = 4'b0000;
+                        clear_reg = 1'b0;  //reset last time running value 1
+                        acc_sig = 3'b1;
+                        acc_is_stop = 0;
+                        clear_reg_acc = 0;
+                        col_index = 3'bxxx;   //需要保证在清除之前就变为0，防止清除数据后col_index还是为7，从而极速计算
+                        clear_reg = 1'b1;   //一组PE array计算之前，需要清除上一次PE array计算的结果，防止在本次计算中继续叠加
+                        #2
+                        clear_reg = 1'b0;
+                        for(integer unit_idx = 0; unit_idx < 8; unit_idx ++)begin //每一轮需要8次读数据到PE-array， unit_idx = col_index
+                            debug = 8'h2f;
+                            col_index = unit_idx;
+                            unit_tile_idx_in = unit_idx;
+                            unit_tile_idx_par = unit_idx;
+                            #4
+                            is_save_cu_out = 4'b0000;
+                            sel_cu = 8'b11111111;   //multiplication
+                            sel_cu_go_back = 8'b10101010;  //go next
+                            #4
+                            sel_adder = 8'b10101010;  //adder tree
+                            #4;   
+                            if(ver_portion_id == 2 && sub_idx == 0 && unit_idx == 0)begin  //表示2轮InputBuf和ParmeterBuf的数据都读取完了，Acc累加完毕, acc保存的就是最终值，进入下一步激活ReLu
+                                //acc输入到ReLu
+                                #4;  //这里需要等一下PE array的结果出来之后再输出
+                                acc_is_stop = 1;  //输出结果，然后等2个时间单位，再清除累加和
+                                is_scalar = 1;
+                                //ReLu输入到OutputBuf
+                                is_output_relu = 1;
+                                //写入OutputBuf相关信号准备
+                                output_write_en = 1;
+                                output_read_en = 0;
+                                
+                                data_idx = hor_portion_id % 16;   //一组hor_portion循环保存4个数，16个保存64个数
+                                pe_idx = 16 + hor_portion_id / 16;  //上一轮用掉了16行PE的存储空间
+                                #4
+                                acc_is_stop = 0; 
+                                //PE array 8列数据计算完成，清除内部累加寄存器，否则第二次循环的话，会把上一次的值累加
+                                clear_reg_acc = 1'b1;
+                                #2
+                                clear_reg_acc = 1'b0;
+                                output_write_en = 0;
+                                output_read_en = 0;
+                            end else begin   //数据输出到acc就结束了（4个数）
+                                acc_is_stop = 0;
+                            end
+
+                            #2;
+                        end
+                    end
+                end
+            end    
+            //-------------------------------计算L2层结果finish-------------------------
+
+            //-------------------------------计算L3层结果start-------------------------
+            //加载L3层的输入和权重数据
+            load_layer3_inputs();
+            //写入L3层的输入数据到InputBuffer
+            input_read_en = 0;
+            input_write_en = 1;
+            for(integer col = 0, num = 0; col < 2; col = col + 1)begin  //513个数保存2列
+                select_mlb = col;
+                for(integer row = 0; row < 32; row = row + 1)begin  //第一列保存32行，第2列保存1个数(biase)
+                    sub_tile_idx_in = row / 8;
+                    unit_tile_idx_in = row % 8;
+                    for(integer k = 0; k < 16; k = k + 1)begin
+                        num = col*512+row*16+k;
+                        if(num <= 512)begin
+                            input_buf_in[k] = layer3_input[num];  //按列优先的顺序来依次写入到InputBuf
+                        end else begin
+                            input_buf_in[k] = 0;
+                        end
+                    end
+                    #2;
+                end
+                
+            end
+            //开始进行L3层的数据计算，将256个数据分成64段去求，每一段的4个值求出来了，再求下一段
+            for(integer hor_portion_id = 0, col_start = 0; hor_portion_id < 64; hor_portion_id = hor_portion_id + 1)begin
+                debug_hor_portion_id = hor_portion_id;
+                col_start = 4 * hor_portion_id;
+                clear_reg_acc = 1;  //清除累加值acc_data，避免第二段数据求值的时候，继续被累加sub_idx
+                #2
+                clear_reg_acc = 0;
+                //垂直取weights（513*256）的数据，取满InputBuf共2轮，计算出最终的4/256个数, 第二轮就取一个1
+                for(integer ver_portion_id = 0, row_start = 0; ver_portion_id < 2; ver_portion_id = ver_portion_id + 1)begin 
+                    row_start = 512 * ver_portion_id;  //每组取32个PE的数据，每个PE取16个数
+                    select_mlb = ver_portion_id;
+                    //从内存中读满参数到parameter中
+                    par_write_en = 1;
+                    par_read_en = 0; 
+                    for(integer i = 0, row_num = 0; i < 32; i++)begin  //总共32行
+                        for(int j = 0; j < 4; j++)begin   //4列
+                            for(int k = 0; k < 16; k++)begin //每个PE有16个数
+                                row_num = row_start+j*16+k;
+                                sub_tile_idx_par = i/8;
+                                unit_tile_idx_par = i%8;
+                                if(row_num <= 512)begin
+                                    par_buf_in[j*16+k] = layer3_weights[row_start+i*16+k][col_start+j];
+                                end else begin
+                                    par_buf_in[j*16+k] = 0;
+                                end
+                            end
+                            #2;
+                        end
+                    end
+
+                    //从InputBuf和ParmeterBuf开始读数据到PE array中计算
+                    input_read_en = 1;
+                    input_write_en = 0;
+                    par_read_en = 1;
+                    par_write_en = 0;
+                    for(integer sub_idx = 0; sub_idx < 4; sub_idx ++)begin  //4轮PE-array才能计算完全部InputBuf和ParBuf
+                        sub_tile_idx_in = sub_idx;
+                        sub_tile_idx_par = sub_idx;
+                        sum_row_pe = 2'b10;    
+                        sum_column_pe = 2'b01;  // 输出一行PE的和到scalar_out[3:0]
+                        is_save_cu_out = 4'b0000;
+                        clear_reg = 1'b0;  //reset last time running value 1
+                        acc_sig = 3'b1;
+                        acc_is_stop = 0;
+                        clear_reg_acc = 0;
+                        col_index = 3'bxxx;   //需要保证在清除之前就变为0，防止清除数据后col_index还是为7，从而极速计算
+                        clear_reg = 1'b1;   //一组PE array计算之前，需要清除上一次PE array计算的结果，防止在本次计算中继续叠加
+                        #2
+                        clear_reg = 1'b0;
+                        for(integer unit_idx = 0; unit_idx < 8; unit_idx ++)begin //每一轮需要8次读数据到PE-array， unit_idx = col_index
+                            col_index = unit_idx;
+                            unit_tile_idx_in = unit_idx;
+                            unit_tile_idx_par = unit_idx;
+                            #4
+                            is_save_cu_out = 4'b0000;
+                            sel_cu = 8'b11111111;   //multiplication
+                            sel_cu_go_back = 8'b10101010;  //go next
+                            #4
+                            sel_adder = 8'b10101010;  //adder tree
+                            #4;   
+                            if(ver_portion_id == 1 && sub_idx == 0 && unit_idx == 0)begin  //表示2轮InputBuf和ParmeterBuf的数据都读取完了，Acc累加完毕, acc保存的就是最终值，进入下一步激活ReLu
+                                //acc输入到ReLu
+                                #4;  //这里需要等一下PE array的结果出来之后再输出
+                                acc_is_stop = 1;  //输出结果，然后等2个时间单位，再清除累加和
+                                is_scalar = 1;
+                                //ReLu输入到OutputBuf
+                                is_output_relu = 1;
+                                //写入OutputBuf相关信号准备
+                                output_write_en = 1;
+                                output_read_en = 0;
+                                data_idx = hor_portion_id % 16;   //一组hor_portion循环保存4个数，16个保存64个数
+                                pe_idx = 24 + hor_portion_id / 16;  //前2轮用掉了24行PE的存储空间
+                                #4
+                                acc_is_stop = 0; 
+                                //PE array 8列数据计算完成，清除内部累加寄存器，否则第二次循环的话，会把上一次的值累加
+                                clear_reg_acc = 1'b1;
+                                #2
+                                clear_reg_acc = 1'b0;
+                                output_write_en = 0;
+                                output_read_en = 0;
+                            end else begin   //数据输出到acc就结束了（4个数）
+                                acc_is_stop = 0;
+                            end
+
+                            #2;
+                        end
+                    end
+                end
+            end    
+            //-------------------------------计算L3层结果finish-------------------------
+
+            //-------------------------------计算L4层结果start-------------------------
+            //加载L4层的输入和权重数据
+            load_layer4_inputs();
+            //写入L4层的输入数据到InputBuffer
+            input_read_en = 0;
+            input_write_en = 1;
+            for(integer col = 0, num = 0; col < 1; col = col + 1)begin  //257个数保存1列
+                select_mlb = col;
+                for(integer row = 0; row < 32; row = row + 1)begin  //第一列保存17行, 第17行保存1
+                    sub_tile_idx_in = row / 8;
+                    unit_tile_idx_in = row % 8;
+                    for(integer k = 0; k < 16; k = k + 1)begin
+                        num = col*512+row*16+k;
+                        if(num <= 256)begin
+                            input_buf_in[k] = layer4_input[num];  //按列优先的顺序来依次写入到InputBuf
+                        end else begin
+                            input_buf_in[k] = 0;
+                        end
+                    end
+                    #2;
+                end
+                
+            end
+            //开始进行L4层的数据计算，将10个数据分成3段去求，每一段的4个值求出来了，再求下一段
+            for(integer hor_portion_id = 0, col_start = 0; hor_portion_id < 3; hor_portion_id = hor_portion_id + 1)begin
+                debug_hor_portion_id = hor_portion_id;
+                col_start = 4 * hor_portion_id;
+                clear_reg_acc = 1;  //清除累加值acc_data，避免第二段数据求值的时候，继续被累加sub_idx
+                #2
+                clear_reg_acc = 0;
+                //垂直取weights（256*10）的数据，取满InputBuf共1轮，计算出最终的4/10个数
+                for(integer ver_portion_id = 0, row_start = 0; ver_portion_id < 1; ver_portion_id = ver_portion_id + 1)begin 
+                    row_start = 0;  //每组取32个PE的数据，每个PE取16个数
+                    select_mlb = ver_portion_id;
+                    //从内存中读满参数到parameter中
+                    par_write_en = 1;
+                    par_read_en = 0; 
+                    for(integer i = 0, row_num = 0; i < 32; i++)begin  //总共32行
+                        for(int j = 0; j < 4; j++)begin   //4列
+                            for(int k = 0; k < 16; k++)begin //每个PE有16个数
+                                row_num = row_start+j*16+k;
+                                sub_tile_idx_par = i/8;
+                                unit_tile_idx_par = i%8;
+                                if(row_num <= 256)begin
+                                    par_buf_in[j*16+k] = layer4_weights[row_start+i*16+k][col_start+j];
+                                end else begin
+                                    par_buf_in[j*16+k] = 0;
+                                end
+                            end
+                            #2;
+                        end
+                    end
+
+                    //从InputBuf和ParmeterBuf开始读数据到PE array中计算
+                    input_read_en = 1;
+                    input_write_en = 0;
+                    par_read_en = 1;
+                    par_write_en = 0;
+                    for(integer sub_idx = 0; sub_idx < 4; sub_idx ++)begin  //4轮PE-array才能计算完全部InputBuf和ParBuf
+                        sub_tile_idx_in = sub_idx;
+                        sub_tile_idx_par = sub_idx;
+                        sum_row_pe = 2'b10;    
+                        sum_column_pe = 2'b01;  // 输出一行PE的和到scalar_out[3:0]
+                        is_save_cu_out = 4'b0000;
+                        clear_reg = 1'b0;  //reset last time running value 1
+                        acc_sig = 3'b1;
+                        acc_is_stop = 0;
+                        clear_reg_acc = 0;
+                        col_index = 3'bxxx;   //需要保证在清除之前就变为0，防止清除数据后col_index还是为7，从而极速计算
+                        clear_reg = 1'b1;   //一组PE array计算之前，需要清除上一次PE array计算的结果，防止在本次计算中继续叠加
+                        #2
+                        clear_reg = 1'b0;
+                        for(integer unit_idx = 0; unit_idx < 8; unit_idx ++)begin //每一轮需要8次读数据到PE-array， unit_idx = col_index
+                            col_index = unit_idx;
+                            unit_tile_idx_in = unit_idx;
+                            unit_tile_idx_par = unit_idx;
+                            #4
+                            is_save_cu_out = 4'b0000;
+                            sel_cu = 8'b11111111;   //multiplication
+                            sel_cu_go_back = 8'b10101010;  //go next
+                            #4
+                            sel_adder = 8'b10101010;  //adder tree
+                            #4;   
+                            if(sub_idx == 2 && unit_idx == 0)begin  //表示2轮InputBuf和ParmeterBuf的数据都读取完了，Acc累加完毕, acc保存的就是最终值，进入下一步激活ReLu
+                                //acc输入到ReLu
+                                #4;  //这里需要等一下PE array的结果出来之后再输出
+                                //写入OutputBuf相关信号准备
+                                is_scalar = 1;
+                                output_write_en = 1;
+                                output_read_en = 0;
+                                acc_is_stop = 1;  //输出结果，然后等2个时间单位，再清除累加和
+                                //ReLu输入到OutputBuf
+                                is_output_relu = 1;
+                                data_idx = hor_portion_id % 16;   //一组hor_portion循环保存4个数，16个保存64个数
+                                pe_idx = 28 + hor_portion_id / 16;  //前3轮用掉了28行PE的存储空间
+                                #4
+                                acc_is_stop = 0;  
+                                //PE array 8列数据计算完成，清除内部累加寄存器，否则第二次循环的话，会把上一次的值累加
+                                clear_reg_acc = 1'b1;
+                                #2
+                                clear_reg_acc = 1'b0;
+                                output_write_en = 0;
+                                output_read_en = 0;
+                            end else begin   //数据输出到acc就结束了（4个数）
+                                acc_is_stop = 0;
+                            end
+
+                            #2;
+                        end
+                    end
+                end
+            end    
+            //-------------------------------计算L4层结果finish-------------------------
             
         end
         #100

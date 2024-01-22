@@ -76,6 +76,7 @@ always @(posedge clk or negedge rst)begin:compare
             4'b0010:   //ReLu激活函数
             begin
                 out = in[31] > 0 ? 0 : in;
+                // out = in;
             end
         endcase
         
