@@ -231,10 +231,12 @@ module test_knn;
 
     //输出保存
 
-    initial begin              
-        $fsdbDumpfile("tb.fsdb");
-        $fsdbDumpvars(0);
-        $fsdbDumpMDA();
+    initial begin     
+        if(TEST_N < 100)begin
+            $fsdbDumpfile("tb.fsdb");
+            $fsdbDumpvars(0);
+            $fsdbDumpMDA();
+        end         
         clk = 0;
         rst = 1;
         forever begin

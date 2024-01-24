@@ -410,10 +410,12 @@ module test_knn;
     endtask
 
 
-    initial begin              
-        $fsdbDumpfile("tb2.fsdb");
-        $fsdbDumpvars(0);
-        $fsdbDumpMDA();
+    initial begin         
+        if(TEST_N < 100)begin
+            $fsdbDumpfile("tb2.fsdb");
+            $fsdbDumpvars(0);
+            $fsdbDumpMDA();
+        end     
         clk = 0;
         rst = 1;
         forever begin

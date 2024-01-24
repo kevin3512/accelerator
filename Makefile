@@ -20,6 +20,9 @@ verdi  :
 #verdi2 use to check PuDianNao relate wave file
 verdi2  :
 	verdi -f filelist2.f -ssf tb2.fsdb &
+
+verdi_c  :
+	verdi -f filelist.f -ssf $(tb) &
 #-------------------------------------------------------------------------------------------------------
 clean  :
 	 rm  -rf  *~  core  csrc  simv*  vc_hdrs.h  ucli.key  urg* *.log  novas.* *.fsdb* verdiLog  64* DVEfiles *.vpd
