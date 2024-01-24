@@ -10,4 +10,4 @@
 ./InputBuffer.sv
 ./ParameterBuffer.sv
 ./OutputBuffer.sv
-./sv/PE_array_dnn.sv
+./sv/PE_array_dnn_pipeline.sv

@@ -1,6 +1,6 @@
-//DNN模型
+//DNN模型 硬件流水线结构
 `timescale 1ns/1ns
-module test_dnn;
+module test_dnn_pipeline;
     parameter         REF_IMAGE_NUM = 60000;
     parameter         TEST_IMAGE_NUM = 10000;
     parameter         IMAGE_SIZE = 784;   //28*28
@@ -96,6 +96,7 @@ module test_dnn;
     reg[7:0]        debug_ref_image[59:0][783:0];
     integer         debug_hor_portion_id;
     reg[7:0]         debug;
+    reg[31:0]       debug_layer1_weight[784:0][11:0];
 
     //Input buffer
     InputBuffer input_buf_ins(
@@ -216,12 +217,12 @@ module test_dnn;
         .out(relu_out[3])); 
 
     //输出保存
-    initial begin        
+    initial begin    
         if(TEST_N < 100)begin
-            $fsdbDumpfile("tb.fsdb");
+            $fsdbDumpfile("tb_pipeline.fsdb");
             $fsdbDumpvars(0);
             $fsdbDumpMDA();
-        end       
+        end      
         clk = 0;
         rst = 1;
         forever begin
@@ -444,6 +445,10 @@ module test_dnn;
         for(integer kk2 = 0; kk2 < 60; kk2 = kk2 + 1)begin
             debug_ref_image[kk2][783:0] = ref_images[kk2][783:0];
         end
+        for(integer kk3 = 0; kk3 <= 784; kk3 = kk3 + 1)begin
+            debug_layer1_weight[kk3][11:0] = layer1_weights[kk3][11:0];
+        end
+       
         //总共对多少张测试图片进行分类
         for(test_index = 0; test_index < TEST_N; test_index = test_index + 1)begin
             $display("正在计算第%0d张测试图片的分类结果", test_index);
@@ -452,7 +457,7 @@ module test_dnn;
             //加载L1层的输入和权重数据
             load_layer1_inputs();
             debug = 8'h11;
-            //写入一张图片数据到InputBuffer
+            //从内存写入一张图片数据到InputBuffer
             input_read_en = 0;
             input_write_en = 1;
             for(integer col = 0, num = 0; col < 2; col = col + 1)begin  //一张图片保存2列
@@ -470,10 +475,30 @@ module test_dnn;
                     end
                     #2;
                 end
-                
             end
+
+            //从内存写入数据到ParameterBuffer中，写入第一块，后面的会在PE计算的时候拆分写入
+            par_write_en = 1;
+            par_read_en = 0; 
+            for(integer i = 0, row_num = 0; i < 32; i++)begin  //总共32行
+                for(int j = 0; j < 4; j++)begin   //4列
+                    for(int k = 0; k < 16; k++)begin //每个PE有16个数
+                        row_num = i*16+k;
+                        sub_tile_idx_par = i/8;
+                        unit_tile_idx_par = i%8;
+                        if(row_num <= 784)begin
+                            par_buf_in[j*16+k] = layer1_weights[row_num][j];
+                        end else begin
+                            par_buf_in[j*16+k] = 0;
+                        end
+                    end
+                    #2;
+                end
+            end
+
             debug = 8'h12;
-            //开始进行L1层的数据计算，将1024个数据分成256段去求，每一段的4个值求出来了，再求下一段
+            //开始进行L1层的数据计算，将1024个数据分成256段去求，每一段的4个值求出来了，再求下一段 
+            //开始求1024个数据的循环，硬件结构流水线也开始工作，每计算一个PE，都会加载ParameterBuffer 1/8的数据，确保一轮PE-array执行完后，可以直接调用数据，而不用等待仿存
             for(integer hor_portion_id = 0, col_start = 0; hor_portion_id < 256; hor_portion_id = hor_portion_id + 1)begin
                 debug = 8'h13;
                 debug_hor_portion_id = hor_portion_id;
@@ -486,24 +511,6 @@ module test_dnn;
                     debug = 8'h14;
                     row_start = 512 * ver_portion_id;  //每组取32个PE的数据，每个PE取16个数
                     select_mlb = ver_portion_id;
-                    //从内存中读满参数到parameter中
-                    par_write_en = 1;
-                    par_read_en = 0; 
-                    for(integer i = 0, row_num = 0; i < 32; i++)begin  //总共32行
-                        for(int j = 0; j < 4; j++)begin   //4列
-                            for(int k = 0; k < 16; k++)begin //每个PE有16个数
-                                row_num = row_start+i*16+k;
-                                sub_tile_idx_par = i/8;
-                                unit_tile_idx_par = i%8;
-                                if(row_num <= 784)begin
-                                    par_buf_in[j*16+k] = layer1_weights[row_start+i*16+k][col_start+j];
-                                end else begin
-                                    par_buf_in[j*16+k] = 0;
-                                end
-                            end
-                            #2;
-                        end
-                    end
 
                     //从InputBuf和ParmeterBuf开始读数据到PE array中计算
                     input_read_en = 1;
@@ -512,7 +519,7 @@ module test_dnn;
                     par_write_en = 0;
                     for(integer sub_idx = 0; sub_idx < 4; sub_idx ++)begin  //4轮PE-array才能计算完全部InputBuf和ParBuf
                         sub_tile_idx_in = sub_idx;
-                        sub_tile_idx_par = sub_idx;
+                        sub_tile_idx_par = 0;   //不用变了，只需要sub0即可，每列PE运行完后，会写入下一轮的值
                         sum_row_pe = 2'b10;    
                         sum_column_pe = 2'b01;  // 输出一行PE的和到scalar_out[3:0]
                         is_save_cu_out = 4'b0000;
@@ -559,6 +566,25 @@ module test_dnn;
                             end
 
                             #2;
+                            //一列PE开始计算完成的同时，开始加载8列PE运行完成之后的数据，也就是往下移8个数据块(一个数据块是16行4列)，也就是128行
+                            par_read_en = 0;
+                            par_write_en = 1;
+                            for(integer j = 0, row_num = 0; j < 4; j = j + 1)begin  //表示横向取4个数
+                                row_num = sub_idx * 8 + unit_idx + 8;   //表示要取第几行PE的数据 （PE行往下移8格）
+                                for(integer i = 0; i < 16; i = i + 1)begin  //表示纵向取16个数
+                                    if(col_start + j + 4 < 1024)begin  //不是最后一轮都会提前加载数据
+                                        if(ver_portion_id == 1 && row_num == 32)begin  //当前是最后一块，下一块需要右移
+                                            par_buf_in[i + 16 * j] = layer1_weights[i][col_start + j + 4];
+                                        end else begin  //往下推移一块
+                                            par_buf_in[i + 16 * j] = layer1_weights[ver_portion_id * 512 +  row_num * 16 + i][col_start + j];
+                                        end
+                                    end
+                                end
+                            end
+                            #2;
+                            //恢复读操作
+                            par_read_en = 1;   
+                            par_write_en = 0;
                         end
                     end
                 end
@@ -602,24 +628,6 @@ module test_dnn;
                 for(integer ver_portion_id = 0, row_start = 0; ver_portion_id < 3; ver_portion_id = ver_portion_id + 1)begin 
                     row_start = 512 * ver_portion_id;  //每组取32个PE的数据，每个PE取16个数
                     select_mlb = ver_portion_id;
-                    //从内存中读满参数到parameter中
-                    par_write_en = 1;
-                    par_read_en = 0; 
-                    for(integer i = 0, row_num = 0; i < 32; i++)begin  //总共32行
-                        for(int j = 0; j < 4; j++)begin   //4列
-                            for(int k = 0; k < 16; k++)begin //每个PE有16个数
-                                row_num = row_start+i*16+k;
-                                sub_tile_idx_par = i/8;
-                                unit_tile_idx_par = i%8;
-                                if(row_num <= 1024)begin
-                                    par_buf_in[j*16+k] = layer2_weights[row_start+i*16+k][col_start+j];
-                                end else begin
-                                    par_buf_in[j*16+k] = 0;
-                                end
-                            end
-                            #2;
-                        end
-                    end
 
                     //从InputBuf和ParmeterBuf开始读数据到PE array中计算
                     input_read_en = 1;
@@ -628,7 +636,7 @@ module test_dnn;
                     par_write_en = 0;
                     for(integer sub_idx = 0; sub_idx < 4; sub_idx ++)begin  //4轮PE-array才能计算完全部InputBuf和ParBuf
                         sub_tile_idx_in = sub_idx;
-                        sub_tile_idx_par = sub_idx;
+                        sub_tile_idx_par = 0;   //不用变了，只需要sub0即可，每列PE运行完后，会写入下一轮的值
                         sum_row_pe = 2'b10;    
                         sum_column_pe = 2'b01;  // 输出一行PE的和到scalar_out[3:0]
                         is_save_cu_out = 4'b0000;
@@ -675,6 +683,26 @@ module test_dnn;
                             end
 
                             #2;
+                            //一列PE开始计算完成的同时，开始加载8列PE运行完成之后的数据，也就是往下移8个数据块(一个数据块是16行4列)，也就是128行
+                            par_read_en = 0;
+                            par_write_en = 1;
+                            for(integer j = 0, row_num = 0; j < 4; j = j + 1)begin  //表示横向取4个数
+                                row_num = sub_idx * 8 + unit_idx + 8;   //表示要取第几行PE的数据 （PE行往下移8格）
+                                for(integer i = 0; i < 16; i = i + 1)begin  //表示纵向取16个数
+                                    if(col_start + j + 4 < 512)begin  //不是最后一轮都会提前加载数据
+                                        if(ver_portion_id == 1 && row_num == 32)begin  //当前是最后一块，下一块需要右移
+                                            par_buf_in[i + 16 * j] = layer2_weights[i][col_start + j + 4];
+                                        end else begin  //往下推移一块
+                                            par_buf_in[i + 16 * j] = layer2_weights[ver_portion_id * 512 +  row_num * 16 + i][col_start + j];
+                                        end
+                                    end
+                                end
+                            end
+                            #2;
+                            //恢复读操作
+                            par_read_en = 1;   
+                            par_write_en = 0;
+                            
                         end
                     end
                 end
@@ -715,24 +743,6 @@ module test_dnn;
                 for(integer ver_portion_id = 0, row_start = 0; ver_portion_id < 2; ver_portion_id = ver_portion_id + 1)begin 
                     row_start = 512 * ver_portion_id;  //每组取32个PE的数据，每个PE取16个数
                     select_mlb = ver_portion_id;
-                    //从内存中读满参数到parameter中
-                    par_write_en = 1;
-                    par_read_en = 0; 
-                    for(integer i = 0, row_num = 0; i < 32; i++)begin  //总共32行
-                        for(int j = 0; j < 4; j++)begin   //4列
-                            for(int k = 0; k < 16; k++)begin //每个PE有16个数
-                                row_num = row_start+i*16+k;
-                                sub_tile_idx_par = i/8;
-                                unit_tile_idx_par = i%8;
-                                if(row_num <= 512)begin
-                                    par_buf_in[j*16+k] = layer3_weights[row_start+i*16+k][col_start+j];
-                                end else begin
-                                    par_buf_in[j*16+k] = 0;
-                                end
-                            end
-                            #2;
-                        end
-                    end
 
                     //从InputBuf和ParmeterBuf开始读数据到PE array中计算
                     input_read_en = 1;
@@ -741,7 +751,7 @@ module test_dnn;
                     par_write_en = 0;
                     for(integer sub_idx = 0; sub_idx < 4; sub_idx ++)begin  //4轮PE-array才能计算完全部InputBuf和ParBuf
                         sub_tile_idx_in = sub_idx;
-                        sub_tile_idx_par = sub_idx;
+                        sub_tile_idx_par = 0;  //结构流水线不需要多组sub_tile
                         sum_row_pe = 2'b10;    
                         sum_column_pe = 2'b01;  // 输出一行PE的和到scalar_out[3:0]
                         is_save_cu_out = 4'b0000;
@@ -786,6 +796,25 @@ module test_dnn;
                             end
 
                             #2;
+                            //一列PE开始计算完成的同时，开始加载8列PE运行完成之后的数据，也就是往下移8个数据块(一个数据块是16行4列)，也就是128行
+                            par_read_en = 0;
+                            par_write_en = 1;
+                            for(integer j = 0, row_num = 0; j < 4; j = j + 1)begin  //表示横向取4个数
+                                row_num = sub_idx * 8 + unit_idx + 8;   //表示要取第几行PE的数据 （PE行往下移8格）
+                                for(integer i = 0; i < 16; i = i + 1)begin  //表示纵向取16个数
+                                    if(col_start + j + 4 < 256)begin  //不是最后一轮都会提前加载数据
+                                        if(ver_portion_id == 1 && row_num == 32)begin  //当前是最后一块，下一块需要右移
+                                            par_buf_in[i + 16 * j] = layer3_weights[i][col_start + j + 4];
+                                        end else begin  //往下推移一块
+                                            par_buf_in[i + 16 * j] = layer3_weights[ver_portion_id * 512 +  row_num * 16 + i][col_start + j];
+                                        end
+                                    end
+                                end
+                            end
+                            #2;
+                            //恢复读操作
+                            par_read_en = 1;   
+                            par_write_en = 0;
                         end
                     end
                 end
@@ -832,7 +861,7 @@ module test_dnn;
                     for(integer i = 0, row_num = 0; i < 32; i++)begin  //总共32行
                         for(int j = 0; j < 4; j++)begin   //4列
                             for(int k = 0; k < 16; k++)begin //每个PE有16个数
-                                row_num = row_start+i*16+k;
+                                row_num = row_start+j*16+k;
                                 sub_tile_idx_par = i/8;
                                 unit_tile_idx_par = i%8;
                                 if(row_num <= 256)begin
