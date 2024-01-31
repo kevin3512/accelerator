@@ -10,4 +10,4 @@
 ./InputBuffer.sv
 ./ParameterBuffer.sv
 ./OutputBuffer.sv
-./sv/PE_array_LR.sv
+./sv/PE_array_kmeans.sv

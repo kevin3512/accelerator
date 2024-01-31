@@ -14,6 +14,13 @@ vcs2   :
 		-timescale=1ns/1ns \
 		-full64  -R  +vc  +v2k  -sverilog -debug_access+all\
 		|  tee  vcs.log 
+
+vcs_c   :
+	vcs  \
+		-f $(filelist)  \
+		-timescale=1ns/1ns \
+		-full64  -R  +vc  +v2k  -sverilog -debug_access+all\
+		|  tee  vcs.log 
 #-------------------------------------------------------------------------------------------------------
 verdi  :
 	verdi -f filelist.f -ssf tb.fsdb &

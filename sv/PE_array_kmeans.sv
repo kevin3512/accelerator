@@ -1,12 +1,14 @@
-//点积操作
+//Kmeans模型测试
 `timescale 1ns/1ns
-module test_knn;
+module test_kmeans;
     parameter         REF_IMAGE_NUM = 60000;
     parameter         TEST_IMAGE_NUM = 10000;
+    parameter         K = 10;
     parameter         IMAGE_SIZE = 784;   //28*28
     parameter         BUFFER_SIZE = 2048;  //4 块 512
-    parameter         TEST_N = 10;     //实际运行的测试用例数量
-    parameter         REF_N = 60;      //实际运行的参考用例数量（训练集）
+    parameter         TEST_N = 6144;     //实际运行的测试用例数量
+    parameter         REF_N = 1000;      //实际运行的参考用例数量（训练集）
+    integer           ITER_N = 100;       //更新中心簇的次数
     reg               clk;
     reg               rst;
     reg [31:0]        in[3:0][15:0];       
@@ -61,6 +63,7 @@ module test_knn;
 
     integer mlb_num;    //4个MLB采用低位交叉编址的方式 ， 一张图片的数据保存在4个MLB块中
     integer mlb_num_index;
+    integer iter = 0;    
     
     //debug
     reg[7:0]        debug_test_image[9:0][783:0];
@@ -406,140 +409,147 @@ module test_knn;
         for(integer kk2 = 0; kk2 < 60; kk2 = kk2 + 1)begin
             debug_ref_image[kk2][783:0] = ref_images[kk2][783:0];
         end
-        //测试用例数量10000
-        //------------------------------------------向MLB写数据start-------------------------------------------
-        for (img_index = 0; img_index < TEST_N; img_index = img_index + 1)begin
-            $display("正在计算第%0d个图片的分类结果", img_index+1);
-            acc_is_stop = 0;
-            write_en = 1;
-            read_en = 0;
-            //清除一下上一张测试图片保留的排序模块的寄存器数据
-            clear_reg_sort = 1;
-            #2
-            clear_reg_sort = 0;
-            sub_tile_idx_in = 0;
-            unit_tile_idx_in = 0;
-            for(integer j = 0; j < 512; j = j + 16)begin
-                sub_tile_idx_in = j / 128;
-                unit_tile_idx_in = (j / 16) % 8;
-                data_base_idx = sub_tile_idx_in % 2;
-                for(integer k = 0; k < 16; k = k + 1)begin  // 一个PE控制信号需要对应16个输入数据
-                    if(sub_tile_idx_in < 2)begin //使用image0赋值
-                        wire_mem_in[0][j+k] = test_images[img_index][data_base_idx*512+unit_tile_idx_in*64+k];
-                        wire_mem_in[1][j+k] = test_images[img_index][data_base_idx*512+unit_tile_idx_in*64+k+16];
-                        wire_mem_in[2][j+k] = test_images[img_index][data_base_idx*512+unit_tile_idx_in*64+k+32];
-                        wire_mem_in[3][j+k] = test_images[img_index][data_base_idx*512+unit_tile_idx_in*64+k+48];
-                    end else begin  //使用image1赋值 , 这里不加1是为了 把in数据的4块MLB都用一张图填充满，便于和par计算
-                        wire_mem_in[0][j+k] = test_images[img_index][data_base_idx*512+unit_tile_idx_in*64+k];  
-                        wire_mem_in[1][j+k] = test_images[img_index][data_base_idx*512+unit_tile_idx_in*64+k+16];
-                        wire_mem_in[2][j+k] = test_images[img_index][data_base_idx*512+unit_tile_idx_in*64+k+32];
-                        wire_mem_in[3][j+k] = test_images[img_index][data_base_idx*512+unit_tile_idx_in*64+k+48];
-                    end
+        //进行iter_n轮的所有测试用例和10张参考用例之间的距离计算，即可模拟K-means计算过程
+        while(iter < ITER_N)begin
+            $display("正在计算第%0d次迭代更新中心簇", iter+1);
+            iter = iter + 1;
+            //------------------------------------------向MLB写数据start-------------------------------------------
+            for (img_index = 0; img_index < TEST_N; img_index = img_index + 1)begin
+                if(img_index % 100 == 0)begin
+                    $display("正在计算第%0d张图片和2张中心簇的距离", img_index+1);
                 end
-                #2;
-            end
-            // 参考用例数量 60000
-            for(ref_index = 0; ref_index < REF_N; ref_index = ref_index + 2)begin  //一个循环读取2张图片
-                //把2张参考用例图片数据写入到MLB，从内存读取数据到MLB
+                acc_is_stop = 0;
                 write_en = 1;
                 read_en = 0;
-                sub_tile_idx_par = 0;
-                unit_tile_idx_par = 0;
-                for(integer x = 0; x < 512; x = x + 16)begin  //一次循环，给4个MLB赋值
-                    sub_tile_idx_par = x / 128;  // 0~3 变化1次
-                    unit_tile_idx_par = (x / 16) % 8;  //0~7变化4次
-                    data_base_idx = sub_tile_idx_par % 2;
-                    for(integer y = 0 ; y < 16; y = y + 1)begin  // 一个PE控制信号需要对应16个输入数据
-                        if(sub_tile_idx_par < 2)begin //使用image0赋值
-                            wire_mem_par[0][x+y] = ref_images[ref_index][data_base_idx*512+unit_tile_idx_par*64+y];
-                            wire_mem_par[1][x+y] = ref_images[ref_index][data_base_idx*512+unit_tile_idx_par*64+y+16];
-                            wire_mem_par[2][x+y] = ref_images[ref_index][data_base_idx*512+unit_tile_idx_par*64+y+32];
-                            wire_mem_par[3][x+y] = ref_images[ref_index][data_base_idx*512+unit_tile_idx_par*64+y+48];
-                        end else begin  //使用image1赋值
-                            wire_mem_par[0][x+y] = ref_images[ref_index+1][data_base_idx*512+unit_tile_idx_par*64+y];
-                            wire_mem_par[1][x+y] = ref_images[ref_index+1][data_base_idx*512+unit_tile_idx_par*64+y+16];
-                            wire_mem_par[2][x+y] = ref_images[ref_index+1][data_base_idx*512+unit_tile_idx_par*64+y+32];
-                            wire_mem_par[3][x+y] = ref_images[ref_index+1][data_base_idx*512+unit_tile_idx_par*64+y+48];
+                //清除一下上一张测试图片保留的排序模块的寄存器数据
+                clear_reg_sort = 1;
+                #2
+                clear_reg_sort = 0;
+                sub_tile_idx_in = 0;
+                unit_tile_idx_in = 0;
+                for(integer j = 0; j < 512; j = j + 16)begin
+                    sub_tile_idx_in = j / 128;
+                    unit_tile_idx_in = (j / 16) % 8;
+                    data_base_idx = sub_tile_idx_in % 2;
+                    for(integer k = 0; k < 16; k = k + 1)begin  // 一个PE控制信号需要对应16个输入数据
+                        if(sub_tile_idx_in < 2)begin //使用image0赋值
+                            wire_mem_in[0][j+k] = test_images[img_index][data_base_idx*512+unit_tile_idx_in*64+k];
+                            wire_mem_in[1][j+k] = test_images[img_index][data_base_idx*512+unit_tile_idx_in*64+k+16];
+                            wire_mem_in[2][j+k] = test_images[img_index][data_base_idx*512+unit_tile_idx_in*64+k+32];
+                            wire_mem_in[3][j+k] = test_images[img_index][data_base_idx*512+unit_tile_idx_in*64+k+48];
+                        end else begin  //使用image1赋值 , 这里不加1是为了 把in数据的4块MLB都用一张图填充满，便于和par计算
+                            wire_mem_in[0][j+k] = test_images[img_index][data_base_idx*512+unit_tile_idx_in*64+k];  
+                            wire_mem_in[1][j+k] = test_images[img_index][data_base_idx*512+unit_tile_idx_in*64+k+16];
+                            wire_mem_in[2][j+k] = test_images[img_index][data_base_idx*512+unit_tile_idx_in*64+k+32];
+                            wire_mem_in[3][j+k] = test_images[img_index][data_base_idx*512+unit_tile_idx_in*64+k+48];
                         end
-                    end 
+                    end
                     #2;
                 end
-                //还有一些残缺的部分补全一下0
-                for(integer u = 784 ; u < 1024; u = u + 1)begin
-                    for(integer v = 0; v < 4; v = v + 1)begin
-                        wire_mem_in[v][u] = 32'h0;
-                        wire_mem_par[v][u] = 32'h0;
+                // 参考用例数量就是K个中心簇
+                for(ref_index = 0; ref_index < K; ref_index = ref_index + 2)begin  //一个循环读取2张图片
+                    //把2张参考用例图片数据写入到MLB，从内存读取数据到MLB
+                    write_en = 1;
+                    read_en = 0;
+                    sub_tile_idx_par = 0;
+                    unit_tile_idx_par = 0;
+                    for(integer x = 0; x < 512; x = x + 16)begin  //一次循环，给4个MLB赋值
+                        sub_tile_idx_par = x / 128;  // 0~3 变化1次
+                        unit_tile_idx_par = (x / 16) % 8;  //0~7变化4次
+                        data_base_idx = sub_tile_idx_par % 2;
+                        for(integer y = 0 ; y < 16; y = y + 1)begin  // 一个PE控制信号需要对应16个输入数据
+                            if(sub_tile_idx_par < 2)begin //使用image0赋值
+                                wire_mem_par[0][x+y] = ref_images[ref_index][data_base_idx*512+unit_tile_idx_par*64+y];
+                                wire_mem_par[1][x+y] = ref_images[ref_index][data_base_idx*512+unit_tile_idx_par*64+y+16];
+                                wire_mem_par[2][x+y] = ref_images[ref_index][data_base_idx*512+unit_tile_idx_par*64+y+32];
+                                wire_mem_par[3][x+y] = ref_images[ref_index][data_base_idx*512+unit_tile_idx_par*64+y+48];
+                            end else begin  //使用image1赋值
+                                wire_mem_par[0][x+y] = ref_images[ref_index+1][data_base_idx*512+unit_tile_idx_par*64+y];
+                                wire_mem_par[1][x+y] = ref_images[ref_index+1][data_base_idx*512+unit_tile_idx_par*64+y+16];
+                                wire_mem_par[2][x+y] = ref_images[ref_index+1][data_base_idx*512+unit_tile_idx_par*64+y+32];
+                                wire_mem_par[3][x+y] = ref_images[ref_index+1][data_base_idx*512+unit_tile_idx_par*64+y+48];
+                            end
+                        end 
+                        #2;
                     end
-                end
-                clear_reg_acc = 1;  //初始化寄存器的状态，避免出现第一个数据由于acc_out不为0，而出现累加失败的情况，也即32'hxxxx_xxxx + 任何数 依旧是32'hxxxx_xxxx
-                #2 //这里要等2个时间单位，是为了保证pe_array_num=1的时候 ， col_index不会马上变为0，从而导致PE_array无法输出
-                //------------------------------------------向MLB写数据finish-------------------------------------------
-                //------------------------------------------从MLB读数据start--------------------------------------------
-                // 开始对写满的4块MLB进行读数据，然后计算，这里执行4次
-                for(integer w = 0; w < 4; w = w + 1)begin
-                    write_en = 0;
-                    read_en = 1;
-                    sub_tile_idx_in = w;
-                    sub_tile_idx_par = w;
-                    //从MLB中读取8次数据进行计算(cal_distance)
-                    sum_row_pe = 2'b10;    //row select sum of row PE  
-                    sum_column_pe = 2'b10;  //column select sum of column PE
-                    is_save_cu_out = 4'b0000;
-                    clear_reg = 1'b0;  //reset last time running value 1
-                    acc_sig = 3'b1;
-                    acc_is_stop = 0;
-                    clear_reg_acc = 0;
-                    pe_array_num = w;
-                    col_index = 3'bxxx;   //需要保证在清除之前就变为0，防止清除数据后col_index还是为7，从而极速计算
-                    clear_reg = 1'b1;   //一组PE array计算之前，需要清除上一次PE array计算的结果，防止在本次计算中继续叠加
-                    #2
-                    clear_reg = 1'b0;
-                    for (integer z = 0; z < 8; z = z + 1)begin
-                        col_index = z[2:0];
-                        unit_tile_idx_in = z[2:0];
-                        unit_tile_idx_par = z[2:0];
-                        //控制信号清零，这样再次赋值才会生效
-                        sel_cu = 8'b00000000;   //subtraction
-                        sel_cu_go_back = 8'b00000000;  //需要把置为0，否则上一次的结果会顺延到下一个周期
-                        #4
-                        is_save_cu_out = 4'b1111;
-                        sel_cu_go_back = 8'b01010101;  // cu result go to par
-                        sel_adder = 8'b00000000;
-                        #4
-                        sel_cu_go_back = 8'b11111111;  // cu result go to in
-                        #4
+                    //还有一些残缺的部分补全一下0
+                    for(integer u = 784 ; u < 1024; u = u + 1)begin
+                        for(integer v = 0; v < 4; v = v + 1)begin
+                            wire_mem_in[v][u] = 32'h0;
+                            wire_mem_par[v][u] = 32'h0;
+                        end
+                    end
+                    clear_reg_acc = 1;  //初始化寄存器的状态，避免出现第一个数据由于acc_out不为0，而出现累加失败的情况，也即32'hxxxx_xxxx + 任何数 依旧是32'hxxxx_xxxx
+                    #2 //这里要等2个时间单位，是为了保证pe_array_num=1的时候 ， col_index不会马上变为0，从而导致PE_array无法输出
+                    //------------------------------------------向MLB写数据finish-------------------------------------------
+                    //------------------------------------------从MLB读数据start--------------------------------------------
+                    // 开始对写满的4块MLB进行读数据，然后计算，这里执行4次
+                    for(integer w = 0; w < 4; w = w + 1)begin
+                        write_en = 0;
+                        read_en = 1;
+                        sub_tile_idx_in = w;
+                        sub_tile_idx_par = w;
+                        //从MLB中读取8次数据进行计算(cal_distance)
+                        sum_row_pe = 2'b10;    //row select sum of row PE  
+                        sum_column_pe = 2'b10;  //column select sum of column PE
                         is_save_cu_out = 4'b0000;
-                        sel_cu = 8'b11111111;   //multiplication
-                        sel_cu_go_back = 8'b10101010;  //go next
-                        #4
-                        //当is_save_cu_out置为0时，不能马上将sel_adder放开，否则会导致要赋值给in和par的cu_out先给cu_computer_out再给adder_in最终将值输出从而造成结果出错
-                        sel_adder = 8'b10101010;  
-                        #4;   
-                        sel_adder = 8'b00000000;   //在下次减法操作前，需要关闭进入加法树的通道，否则会让减法的结果输出
-                    end
-                    //计算完两个PE array的结果之后，将其累加，才是两张图片之间距离计算的输出
-                    if(w == 1 || w == 3)begin
-                        if(w == 1) begin
-                            sort_ref_index = ref_index;
-                        end else begin
-                            sort_ref_index = ref_index + 1;
+                        clear_reg = 1'b0;  //reset last time running value 1
+                        acc_sig = 3'b1;
+                        acc_is_stop = 0;
+                        clear_reg_acc = 0;
+                        pe_array_num = w;
+                        col_index = 3'bxxx;   //需要保证在清除之前就变为0，防止清除数据后col_index还是为7，从而极速计算
+                        clear_reg = 1'b1;   //一组PE array计算之前，需要清除上一次PE array计算的结果，防止在本次计算中继续叠加
+                        #2
+                        clear_reg = 1'b0;
+                        for (integer z = 0; z < 8; z = z + 1)begin
+                            col_index = z[2:0];
+                            unit_tile_idx_in = z[2:0];
+                            unit_tile_idx_par = z[2:0];
+                            //控制信号清零，这样再次赋值才会生效
+                            sel_cu = 8'b00000000;   //subtraction
+                            sel_cu_go_back = 8'b00000000;  //需要把置为0，否则上一次的结果会顺延到下一个周期
+                            #4
+                            is_save_cu_out = 4'b1111;
+                            sel_cu_go_back = 8'b01010101;  // cu result go to par
+                            sel_adder = 8'b00000000;
+                            #4
+                            sel_cu_go_back = 8'b11111111;  // cu result go to in
+                            #4
+                            is_save_cu_out = 4'b0000;
+                            sel_cu = 8'b11111111;   //multiplication
+                            sel_cu_go_back = 8'b10101010;  //go next
+                            #4
+                            //当is_save_cu_out置为0时，不能马上将sel_adder放开，否则会导致要赋值给in和par的cu_out先给cu_computer_out再给adder_in最终将值输出从而造成结果出错
+                            sel_adder = 8'b10101010;  
+                            #4;   
+                            sel_adder = 8'b00000000;   //在下次减法操作前，需要关闭进入加法树的通道，否则会让减法的结果输出
                         end
-                        #4;  //这里需要等一下PE array的结果出来之后再输出
-                        acc_is_stop = 1;  //输出结果，然后等2个时间单位，再清除累加和
-                        #2
-                        acc_is_stop = 0;  
-                        //PE array 8列数据计算完成，清除内部累加寄存器，否则第二次循环的话，会把上一次的值累加
-                        clear_reg_acc = 1'b1;
-                        #2
-                        clear_reg_acc = 1'b0;
-                    end 
-                    
-                    #2;
+                        //计算完两个PE array的结果之后，将其累加，才是两张图片之间距离计算的输出
+                        if(w == 1 || w == 3)begin
+                            if(w == 1) begin
+                                sort_ref_index = ref_index;
+                            end else begin
+                                sort_ref_index = ref_index + 1;
+                            end
+                            #4;  //这里需要等一下PE array的结果出来之后再输出
+                            acc_is_stop = 1;  //输出结果，然后等2个时间单位，再清除累加和
+                            #2
+                            acc_is_stop = 0;  
+                            //PE array 8列数据计算完成，清除内部累加寄存器，否则第二次循环的话，会把上一次的值累加
+                            clear_reg_acc = 1'b1;
+                            #2
+                            clear_reg_acc = 1'b0;
+                        end 
+                        
+                        #2;
+                    end
+                    //----------------- -------------------------从MLB读数据finish--------------------------------------------
                 end
-                //----------------- -------------------------从MLB读数据finish--------------------------------------------
+                #100;  //这里是为了给最后一个数据时间去处理
             end
-            #100;  //这里是为了给最后一个数据时间去处理
         end
+        
         #100
         $finish; // 完成仿真
     end

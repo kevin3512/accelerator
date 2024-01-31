@@ -7,6 +7,7 @@ module test_k_means;
     parameter                     K = 10;
     parameter                     TEST_N = 6144;     //实际运行的测试用例数量
     parameter                     REF_N = 1000;        //实际运行的参考用例数量（训练集）
+    integer                       ITER_N = 100; 
     reg[7:0]                      ref_images[REF_IMAGE_NUM-1:0][IMAGE_SIZE-1:0];
     reg[7:0]                      ref_labels[REF_IMAGE_NUM-1:0]; 
     reg[7:0]                      test_images[TEST_IMAGE_NUM-1:0][IMAGE_SIZE-1:0];
@@ -60,7 +61,7 @@ module test_k_means;
     // OutputBuffer的输出
     wire[31:0]                    wire_outputbuf_out[255:0]; 
     // 迭代次数
-    integer                       Iter_N;
+    integer                       iter_n;
 
     //debug
     reg[7:0]                      debug_test_image[31:0][783:0];
@@ -442,13 +443,15 @@ module test_k_means;
         end
         ref_index = 0;
         test_index = 0;
-        Iter_N = 10;
-        while(Iter_N > 0)begin
-            Iter_N = Iter_N - 1;
+        while(iter_n < ITER_N)begin
+            $display("正在计算第%0d次迭代更新中心簇", iter+1);
+            iter_n = iter_n + 1;
             //将所有的测试用例，每16张一批，分别和所有的参考图片进行计算距离，并排序
             for(test_index = 0; test_index < TEST_N; test_index = test_index + 16)begin
-                $display("正在计算第%0d~%0d张测试图片的分类结果", test_index, test_index+16);
-                for (ref_index = 0; ref_index < REF_N; ref_index = ref_index + 2)begin  //参考图片10张，一次取2张，占用128个MLU的数据所需
+                 if(test_index % 128 == 0)begin
+                    $display("正在计算第%0d张图片和2张中心簇的距离", test_index);
+                end
+                for (ref_index = 0; ref_index < K; ref_index = ref_index + 2)begin  //参考图片10张，一次取2张，占用128个MLU的数据所需
                     //---------------------------向HotBuffer和ColdBuffer写数据------------------------------------------------------
                     //--------------向HotBuffer写入2张参考图片的数据---------------------------------
                     hot_read_en = 0;
